@@ -193,7 +193,7 @@
                 // Sky
                 const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
                 gradient.addColorStop(0, '#87ceeb');
-                gradient.addColorStop(this.tsunami.y / this.height, '#87ceeb');
+                gradient.addColorStop(Math.max(0, Math.min(1, this.tsunami.y / this.height)), '#87ceeb');
                 gradient.addColorStop(1, '#0099cc');
                 this.ctx.fillStyle = gradient;
                 this.ctx.fillRect(0, 0, this.width, this.height);

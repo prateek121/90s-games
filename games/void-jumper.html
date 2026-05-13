@@ -179,9 +179,11 @@
                     }
                 }
 
-                // Update camera
-                const targetCameraY = Math.max(0, this.player.y - this.height / 3);
-                this.cameraY = targetCameraY;
+                // Update camera (follows player upward, never moves down)
+                const targetCameraY = this.player.y - this.height / 3;
+                if (targetCameraY < this.cameraY) {
+                    this.cameraY = targetCameraY;
+                }
 
                 // Check height reached
                 const heightReached = this.height - this.player.y;
@@ -189,8 +191,8 @@
                     this.maxHeight = heightReached;
                 }
 
-                // Game over conditions
-                if (this.player.y > this.height + 100) {
+                // Game over conditions (fell below visible screen)
+                if (this.player.y - this.cameraY > this.height + 100) {
                     this.gameOver = true;
                 }
 

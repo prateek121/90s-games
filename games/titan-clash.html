@@ -172,7 +172,8 @@
                 this.frameCount++;
 
                 // Spawn enemies
-                if (this.frameCount % (40 - this.wave * 2) === 0 && this.towersToSpawn > 0) {
+                const spawnInterval = Math.max(5, 40 - this.wave * 2);
+                if (this.frameCount % spawnInterval === 0 && this.towersToSpawn > 0) {
                     this.spawnEnemy();
                 }
 

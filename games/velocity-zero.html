@@ -150,6 +150,8 @@
             update() {
                 if (!this.gameRunning || this.gamePaused) return;
 
+                this.frameCount++;
+
                 // Ball physics
                 this.ball.x += this.ball.vx;
                 this.ball.y += this.ball.vy;
