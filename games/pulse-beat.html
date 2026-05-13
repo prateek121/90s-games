@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PULSE BEAT - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a0f2e 0%, #2d1b4e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ff99;
+            background: #0a0a15;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0, 255, 153, 0.5);
+        }
+        .info {
+            color: #00ff99;
+            margin-top: 20px;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(0, 255, 153, 0.5);
+        }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00ff99;
+            text-shadow: 0 0 10px rgba(0, 255, 153, 0.8);
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #00ff99;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ff99;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(0, 255, 153, 0.5);
+        }
+        button:hover {
+            background: #00ffcc;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #00ff99; text-shadow: 0 0 20px rgba(0, 255, 153, 0.8);">♪ PULSE BEAT ♪</h1>
+        <canvas id="gameCanvas" width="450" height="500"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>Click/Tap when circle appears</p>
+                <p>Follow the beat!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 450,
+            height: 500,
+
+            circles: [],
+            particles: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            combo: 0,
+            maxCombo: 0,
+            level: 1,
+            missedNotes: 0,
+            highScore: localStorage.getItem('pulseBeatHigh') || 0,
+            beatTiming: 60,
+            lastBeat: 0,
+            totalNotes: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.circles = [];
+                this.particles = [];
+                this.score = 0;
+                this.combo = 0;
+                this.maxCombo = 0;
+                this.level = 1;
+                this.missedNotes = 0;
+                this.totalNotes = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.lastBeat = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.frameCount++;
+                this.lastBeat++;
+
+                // Spawn circles on beat
+                if (this.lastBeat >= this.beatTiming) {
+                    this.spawnCircle();
+                    this.lastBeat = 0;
+                }
+
+                // Update circles
+                for (let i = this.circles.length - 1; i >= 0; i--) {
+                    const circle = this.circles[i];
+                    circle.age++;
+                    circle.radius = 20 + (circle.maxRadius - 20) * (circle.age / circle.life);
+
+                    // Missed
+                    if (circle.age > circle.life) {
+                        this.combo = 0;
+                        this.circles.splice(i, 1);
+                    }
+                }
+            },
+
+            spawnCircle() {
+                const x = 150 + Math.random() * 150;
+                const y = 150 + Math.random() * 200;
+                this.circles.push({
+                    x: x,
+                    y: y,
+                    radius: 20,
+                    maxRadius: 100,
+                    age: 0,
+                    life: 45,
+                    hit: false
+                });
+                this.totalNotes++;
+                this.level = Math.floor(this.totalNotes / 10) + 1;
+            },
+
+            createParticles(x, y) {
+                for (let i = 0; i < 8; i++) {
+                    const angle = (Math.PI * 2 * i) / 8;
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3,
+                        life: 20
+                    });
+                }
+            },
+
+            clickAt(x, y) {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                let hit = false;
+                for (let i = this.circles.length - 1; i >= 0; i--) {
+                    const circle = this.circles[i];
+                    const dx = x - circle.x;
+                    const dy = y - circle.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < circle.radius && !circle.hit) {
+                        // Calculate timing bonus
+                        const accuracy = 1 - circle.age / circle.life;
+                        const points = Math.round(10 + accuracy * 90);
+                        this.score += points;
+                        this.combo++;
+                        this.maxCombo = Math.max(this.maxCombo, this.combo);
+                        circle.hit = true;
+                        this.createParticles(circle.x, circle.y);
+                        this.circles.splice(i, 1);
+                        hit = true;
+                        break;
+                    }
+                }
+
+                if (!hit && this.circles.length > 0) {
+                    this.combo = 0;
+                    this.missedNotes++;
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#0a0a15';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw beat indicator
+                const beatPhase = this.lastBeat / this.beatTiming;
+                this.ctx.fillStyle = `rgba(0, 255, 153, ${0.3 + 0.2 * Math.sin(beatPhase * Math.PI)})`;
+                this.ctx.fillRect(0, 0, this.width, 40);
+
+                // Title and info
+                this.ctx.fillStyle = '#00ff99';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('Pulse Beat', this.width / 2, 25);
+
+                // Draw circles
+                for (let circle of this.circles) {
+                    // Inner circle
+                    this.ctx.fillStyle = `rgba(0, 255, 153, ${0.3 * (1 - circle.age / circle.life)})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(circle.x, circle.y, circle.radius * 0.7, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Outer ring
+                    this.ctx.strokeStyle = `rgba(0, 255, 153, ${1 - circle.age / circle.life})`;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+
+                    // Sweet spot indicator
+                    const sweetSpot = circle.maxRadius * 0.6;
+                    if (Math.abs(circle.radius - sweetSpot) < 15) {
+                        this.ctx.strokeStyle = '#ffff00';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        this.ctx.arc(circle.x, circle.y, sweetSpot, 0, Math.PI * 2);
+                        this.ctx.stroke();
+                    }
+                }
+
+                // Draw particles
+                this.ctx.fillStyle = '#00ff99';
+                for (let p of this.particles) {
+                    this.ctx.fillRect(p.x, p.y, 4, 4);
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ff99';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 15, this.height - 90);
+                this.ctx.fillText(`Level: ${this.level}`, 15, this.height - 70);
+                this.ctx.fillText(`Combo: ${this.combo}`, 15, this.height - 50);
+                this.ctx.fillText(`Missed: ${this.missedNotes}`, 15, this.height - 30);
+                this.ctx.fillText(`Best: ${this.highScore}`, 280, this.height - 70);
+                this.ctx.fillText(`Max Combo: ${this.maxCombo}`, 280, this.height - 50);
+                this.ctx.fillText(`Notes: ${this.totalNotes}`, 280, this.height - 30);
+
+                // Visual feedback for beat
+                if (beatPhase < 0.3) {
+                    this.ctx.fillStyle = 'rgba(0, 255, 153, 0.1)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                }
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ff99';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.clickAt(x, y);
+                });
+
+                document.addEventListener('touchstart', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    for (let touch of e.touches) {
+                        const x = touch.clientX - rect.left;
+                        const y = touch.clientY - rect.top;
+                        this.clickAt(x, y);
+                    }
+                    e.preventDefault();
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ') {
+                        const rect = this.canvas.getBoundingClientRect();
+                        this.clickAt(this.width / 2, this.height / 2);
+                        e.preventDefault();
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

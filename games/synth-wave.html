@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYNTH WAVE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #ff00ff, #00ffff);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff00ff;
+            background: linear-gradient(to bottom, #ff00ff, #00ffff);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.7);
+        }
+        .info {
+            color: #333;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+            text-shadow: 2px 2px 4px rgba(255, 0, 255, 0.5);
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ff00ff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 10px rgba(255, 0, 255, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #ff00ff; text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);">🎹 SYNTH WAVE 🎹</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Combo: <span id="combo">0</span> | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">Match falling notes with keyboard: A S D F J K L</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            keys: { a: false, s: false, d: false, f: false, j: false, k: false, l: false },
+            lanes: [
+                { x: 30, key: 'a', color: '#ff00ff' },
+                { x: 90, key: 's', color: '#00ffff' },
+                { x: 150, key: 'd', color: '#ffff00' },
+                { x: 210, key: 'f', color: '#00ff00' },
+                { x: 270, key: 'j', color: '#ff0000' },
+                { x: 330, key: 'k', color: '#0000ff' },
+                { x: 360, key: 'l', color: '#ffaa00' }
+            ],
+            notes: [],
+            particles: [],
+            hitZoneTop: 500,
+            hitZoneHeight: 80,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            highScore: localStorage.getItem('synthWaveHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            spawnRate: 25,
+            missCount: 0,
+            maxMisses: 5,
+            difficulty: 1,
+            feedbackText: '',
+            feedbackTimer: 0,
+            multiplierBonus: 1,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.notes = [];
+                this.particles = [];
+                this.score = 0;
+                this.combo = 0;
+                this.maxCombo = 0;
+                this.missCount = 0;
+                this.difficulty = 1;
+                this.feedbackText = '';
+                this.feedbackTimer = 0;
+                this.multiplierBonus = 1;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.spawnRate = 25;
+            },
+
+            spawnNote() {
+                const lane = this.lanes[Math.floor(Math.random() * this.lanes.length)];
+                this.notes.push({
+                    x: lane.x,
+                    y: -20,
+                    key: lane.key,
+                    color: lane.color,
+                    radius: 8,
+                    speed: 4 + Math.floor(this.frameCount / 500) * 0.5,
+                    hit: false
+                });
+            },
+
+            checkHit(key) {
+                let bestNote = null;
+                let bestDistance = 40;
+
+                for (let note of this.notes) {
+                    if (note.key === key && !note.hit) {
+                        const distance = Math.abs(note.y - this.hitZoneTop);
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestNote = note;
+                        }
+                    }
+                }
+
+                if (bestNote) {
+                    bestNote.hit = true;
+                    this.combo++;
+                    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+
+                    const accuracy = Math.max(0, 100 - bestDistance * 3);
+                    let feedback = 'MISS';
+                    if (accuracy >= 95) feedback = 'PERFECT!';
+                    else if (accuracy >= 80) feedback = 'GREAT!';
+                    else if (accuracy >= 60) feedback = 'GOOD';
+                    else feedback = 'OK';
+
+                    this.feedbackText = feedback;
+                    this.feedbackTimer = 20;
+
+                    const multiplier = 1 + Math.floor(this.combo / 5) * 0.5;
+                    const points = Math.max(10, 100 - bestDistance * 2);
+                    this.score += Math.floor(points * multiplier * this.difficulty);
+
+                    this.createHitParticles(bestNote);
+                    return true;
+                } else {
+                    this.combo = 0;
+                    this.missCount++;
+                    if (this.missCount >= this.maxMisses) {
+                        this.endGame();
+                    }
+                }
+                return false;
+            },
+
+            createHitParticles(note) {
+                for (let i = 0; i < 10; i++) {
+                    const angle = (i / 10) * Math.PI * 2;
+                    this.particles.push({
+                        x: note.x,
+                        y: this.hitZoneTop,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3,
+                        life: 20,
+                        color: note.color
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                if (this.feedbackTimer > 0) this.feedbackTimer--;
+
+                this.frameCount++;
+                if (this.frameCount % Math.max(15, this.spawnRate - this.difficulty * 2) === 0) {
+                    this.spawnNote();
+                }
+
+                // Update difficulty
+                if (this.score > 0 && this.score % 500 === 0) {
+                    this.difficulty = Math.min(5, Math.floor(this.score / 500) + 1);
+                }
+
+                // Update notes
+                for (let i = this.notes.length - 1; i >= 0; i--) {
+                    const note = this.notes[i];
+                    note.y += note.speed;
+                    note.speed = 4 + this.difficulty * 0.5;
+
+                    if (note.y > this.height && !note.hit) {
+                        this.combo = 0;
+                        this.missCount++;
+                        if (this.missCount >= this.maxMisses) {
+                            this.endGame();
+                            return;
+                        }
+                        this.notes.splice(i, 1);
+                    } else if (note.y > this.height) {
+                        this.notes.splice(i, 1);
+                    }
+                }
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('combo').textContent = this.combo;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('synthWaveHigh', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Gradient background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#ff00ff');
+                gradient.addColorStop(0.5, '#9933cc');
+                gradient.addColorStop(1, '#00ffff');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Scanlines effect
+                this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                this.ctx.lineWidth = 1;
+                for (let y = 0; y < this.height; y += 2) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.width, y);
+                    this.ctx.stroke();
+                }
+
+                // Lane separators
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                this.ctx.lineWidth = 2;
+                for (let lane of this.lanes) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(lane.x, 0);
+                    this.ctx.lineTo(lane.x, this.height);
+                    this.ctx.stroke();
+                }
+
+                // Hit zone
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                this.ctx.fillRect(0, this.hitZoneTop, this.width, this.hitZoneHeight);
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(0, this.hitZoneTop, this.width, this.hitZoneHeight);
+
+                // Notes
+                for (let note of this.notes) {
+                    this.ctx.fillStyle = note.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(note.x, note.y, note.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    if (!note.hit) {
+                        this.ctx.strokeStyle = '#ffffff';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.stroke();
+                    }
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 20;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Key indicators
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.textAlign = 'center';
+                for (let lane of this.lanes) {
+                    this.ctx.fillText(lane.key.toUpperCase(), lane.x, this.height - 20);
+                    if (this.keys[lane.key]) {
+                        this.ctx.strokeStyle = lane.color;
+                        this.ctx.lineWidth = 3;
+                        this.ctx.strokeRect(lane.x - 20, this.height - 40, 40, 40);
+                    }
+                }
+
+                // Score display
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`COMBO: ${this.combo}`, 10, 30);
+                this.ctx.fillText(`Misses: ${this.missCount}/${this.maxMisses}`, 10, 50);
+                this.ctx.fillText(`Difficulty: ${this.difficulty}`, 10, 70);
+
+                // Feedback text
+                if (this.feedbackTimer > 0) {
+                    const alpha = this.feedbackTimer / 20;
+                    this.ctx.fillStyle = `rgba(255, 255, 0, ${alpha})`;
+                    this.ctx.font = 'bold 20px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.globalAlpha = alpha;
+                    this.ctx.fillText(this.feedbackText, this.width / 2, 200);
+                    this.ctx.globalAlpha = 1;
+                }
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+            },
+
+            setupInput() {
+                const keyMap = { 'a': 'a', 's': 's', 'd': 'd', 'f': 'f', 'j': 'j', 'k': 'k', 'l': 'l' };
+                document.addEventListener('keydown', (e) => {
+                    const key = e.key.toLowerCase();
+                    if (keyMap[key]) {
+                        this.keys[key] = true;
+                        if (this.gameRunning && !this.gamePaused) {
+                            this.checkHit(key);
+                        }
+                    }
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        this.togglePause();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    const key = e.key.toLowerCase();
+                    if (keyMap[key]) {
+                        this.keys[key] = false;
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLOCK SQUAD - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a0033 0%, #330066 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff00ff;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.6);
+        }
+        .info {
+            color: #ff00ff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ff00ff;
+            color: #000;
+            border: 2px solid #ff00ff;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 0, 255, 0.8); }
+        .controls {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="320" height="480"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Lines</div>
+                <div class="stat-value" id="lines">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                LEFT/RIGHT Move<br/>
+                UP Rotate<br/>
+                DOWN Drop<br/>
+                Clear lines!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 320,
+            height: 480,
+            blockSize: 32,
+            cols: 10,
+            rows: 15,
+
+            grid: [],
+            currentBlock: null,
+            nextBlock: null,
+            score: 0,
+            lines: 0,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('blockSquadBest') || 0,
+            dropCounter: 0,
+            dropInterval: 30,
+
+            pieces: [
+                { blocks: [[1, 1, 1, 1]], color: '#00ffff' },
+                { blocks: [[1, 1], [1, 1]], color: '#ffff00' },
+                { blocks: [[1, 1, 1], [0, 1, 0]], color: '#ff00ff' },
+                { blocks: [[1, 1, 1], [1, 0, 0]], color: '#ff6600' },
+                { blocks: [[1, 1, 1], [0, 0, 1]], color: '#0066ff' },
+                { blocks: [[1, 1, 0], [0, 1, 1]], color: '#00ff66' },
+                { blocks: [[0, 1, 1], [1, 1, 0]], color: '#ff3300' }
+            ],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                for (let i = 0; i < this.rows; i++) {
+                    this.grid[i] = new Array(this.cols).fill(0);
+                }
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (!this.gameRunning) return;
+                    if (e.key === 'ArrowLeft') this.moveBlock(-1);
+                    if (e.key === 'ArrowRight') this.moveBlock(1);
+                    if (e.key === 'ArrowUp') this.rotateBlock();
+                    if (e.key === 'ArrowDown') this.dropFast();
+                    if (e.key === ' ') this.start();
+                });
+                this.keys = {};
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    if (!this.currentBlock) this.spawnBlock();
+                }
+            },
+
+            spawnBlock() {
+                this.currentBlock = {
+                    piece: this.pieces[Math.floor(Math.random() * this.pieces.length)],
+                    x: 3,
+                    y: 0
+                };
+                if (this.isColliding(this.currentBlock.x, this.currentBlock.y, this.currentBlock.piece.blocks)) {
+                    this.gameOver = true;
+                }
+            },
+
+            moveBlock(dir) {
+                if (!this.currentBlock) return;
+                const newX = this.currentBlock.x + dir;
+                if (!this.isColliding(newX, this.currentBlock.y, this.currentBlock.piece.blocks)) {
+                    this.currentBlock.x = newX;
+                }
+            },
+
+            rotateBlock() {
+                if (!this.currentBlock) return;
+                const rotated = this.rotateMatrix(this.currentBlock.piece.blocks);
+                if (!this.isColliding(this.currentBlock.x, this.currentBlock.y, rotated)) {
+                    this.currentBlock.piece.blocks = rotated;
+                }
+            },
+
+            rotateMatrix(matrix) {
+                const n = matrix.length;
+                const m = matrix[0].length;
+                const rotated = [];
+                for (let i = 0; i < m; i++) {
+                    rotated[i] = [];
+                    for (let j = 0; j < n; j++) {
+                        rotated[i][j] = matrix[n - 1 - j][i];
+                    }
+                }
+                return rotated;
+            },
+
+            dropFast() {
+                if (!this.currentBlock) return;
+                while (!this.isColliding(this.currentBlock.x, this.currentBlock.y + 1, this.currentBlock.piece.blocks)) {
+                    this.currentBlock.y++;
+                }
+            },
+
+            isColliding(x, y, blocks) {
+                for (let i = 0; i < blocks.length; i++) {
+                    for (let j = 0; j < blocks[i].length; j++) {
+                        if (!blocks[i][j]) continue;
+                        const gridX = x + j;
+                        const gridY = y + i;
+                        if (gridX < 0 || gridX >= this.cols || gridY >= this.rows) return true;
+                        if (gridY >= 0 && this.grid[gridY][gridX]) return true;
+                    }
+                }
+                return false;
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                if (!this.currentBlock) this.spawnBlock();
+
+                this.dropCounter++;
+                if (this.dropCounter >= this.dropInterval) {
+                    this.dropCounter = 0;
+                    if (!this.isColliding(this.currentBlock.x, this.currentBlock.y + 1, this.currentBlock.piece.blocks)) {
+                        this.currentBlock.y++;
+                    } else {
+                        this.lockBlock();
+                    }
+                }
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('blockSquadBest', this.best);
+                }
+            },
+
+            lockBlock() {
+                for (let i = 0; i < this.currentBlock.piece.blocks.length; i++) {
+                    for (let j = 0; j < this.currentBlock.piece.blocks[i].length; j++) {
+                        if (!this.currentBlock.piece.blocks[i][j]) continue;
+                        const gridY = this.currentBlock.y + i;
+                        if (gridY >= 0) {
+                            this.grid[gridY][this.currentBlock.x + j] = this.currentBlock.piece.color;
+                        }
+                    }
+                }
+                this.clearLines();
+                this.currentBlock = null;
+            },
+
+            clearLines() {
+                let cleared = 0;
+                for (let i = this.rows - 1; i >= 0; i--) {
+                    if (this.grid[i].every(cell => cell !== 0)) {
+                        this.grid.splice(i, 1);
+                        this.grid.unshift(new Array(this.cols).fill(0));
+                        cleared++;
+                    }
+                }
+                if (cleared > 0) {
+                    this.lines += cleared;
+                    this.score += cleared * cleared * 100;
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw grid
+                this.ctx.strokeStyle = '#333';
+                this.ctx.lineWidth = 1;
+                for (let i = 0; i <= this.cols; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i * this.blockSize, 0);
+                    this.ctx.lineTo(i * this.blockSize, this.height);
+                    this.ctx.stroke();
+                }
+                for (let i = 0; i <= this.rows; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, i * this.blockSize);
+                    this.ctx.lineTo(this.width, i * this.blockSize);
+                    this.ctx.stroke();
+                }
+
+                // Draw placed blocks
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        if (this.grid[i][j]) {
+                            this.ctx.fillStyle = this.grid[i][j];
+                            this.ctx.fillRect(j * this.blockSize + 2, i * this.blockSize + 2, this.blockSize - 4, this.blockSize - 4);
+                            this.ctx.strokeStyle = '#fff';
+                            this.ctx.lineWidth = 1;
+                            this.ctx.strokeRect(j * this.blockSize + 2, i * this.blockSize + 2, this.blockSize - 4, this.blockSize - 4);
+                        }
+                    }
+                }
+
+                // Draw current block
+                if (this.currentBlock) {
+                    for (let i = 0; i < this.currentBlock.piece.blocks.length; i++) {
+                        for (let j = 0; j < this.currentBlock.piece.blocks[i].length; j++) {
+                            if (this.currentBlock.piece.blocks[i][j]) {
+                                const x = (this.currentBlock.x + j) * this.blockSize + 2;
+                                const y = (this.currentBlock.y + i) * this.blockSize + 2;
+                                this.ctx.fillStyle = this.currentBlock.piece.color;
+                                this.ctx.fillRect(x, y, this.blockSize - 4, this.blockSize - 4);
+                                this.ctx.strokeStyle = '#fff';
+                                this.ctx.lineWidth = 1;
+                                this.ctx.strokeRect(x, y, this.blockSize - 4, this.blockSize - 4);
+                            }
+                        }
+                    }
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = 'bold 12px monospace';
+                this.ctx.textAlign = 'left';
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff00ff';
+                    this.ctx.font = 'bold 20px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('lines').textContent = this.lines;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.grid = [];
+                for (let i = 0; i < this.rows; i++) {
+                    this.grid[i] = new Array(this.cols).fill(0);
+                }
+                this.currentBlock = null;
+                this.nextBlock = null;
+                this.score = 0;
+                this.lines = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.dropCounter = 0;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

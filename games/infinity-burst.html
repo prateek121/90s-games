@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INFINITY BURST - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a1a3e 0%, #0d0d2e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ffaa00;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 170, 0, 0.6);
+        }
+        .info {
+            color: #ffaa00;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 170, 0, 0.1);
+            border: 2px solid #ffaa00;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ffaa00;
+            color: #000;
+            border: 2px solid #ffaa00;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 170, 0, 0.8); }
+        .controls {
+            background: rgba(255, 170, 0, 0.1);
+            border: 2px solid #ffaa00;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="480" height="480"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Combo</div>
+                <div class="stat-value" id="combo">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                MOUSE Aim & click<br/>
+                Burst targets<br/>
+                Chain combos!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 480,
+            height: 480,
+
+            targets: [],
+            explosions: [],
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('infinityBurstBest') || 0,
+            mouseX: 240,
+            mouseY: 240,
+            targetRadius: 30,
+            spawnRate: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = e.clientX - rect.left;
+                    this.mouseY = e.clientY - rect.top;
+                });
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.handleClick(x, y);
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            spawnTarget() {
+                this.targets.push({
+                    x: Math.random() * (this.width - 80) + 40,
+                    y: Math.random() * (this.height - 80) + 40,
+                    radius: this.targetRadius,
+                    color: `hsl(${Math.random() * 60 + 30}, 100%, 50%)`,
+                    alive: true,
+                    pulsePhase: Math.random() * Math.PI * 2
+                });
+            },
+
+            handleClick(x, y) {
+                if (!this.gameRunning) return;
+
+                let hit = false;
+                for (let i = this.targets.length - 1; i >= 0; i--) {
+                    const t = this.targets[i];
+                    const dx = x - t.x;
+                    const dy = y - t.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < t.radius) {
+                        this.burstTarget(t);
+                        this.targets.splice(i, 1);
+                        hit = true;
+                        break;
+                    }
+                }
+
+                if (hit) {
+                    this.combo++;
+                    this.score += 10 * this.combo;
+                    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+                } else {
+                    this.combo = 0;
+                }
+            },
+
+            burstTarget(target) {
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    const speed = 4 + Math.random() * 2;
+                    this.explosions.push({
+                        x: target.x,
+                        y: target.y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 30,
+                        color: target.color,
+                        size: 5
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Spawn targets
+                this.spawnRate++;
+                if (this.spawnRate > 40 - this.combo * 2) {
+                    this.spawnTarget();
+                    this.spawnRate = 0;
+                }
+
+                // Update targets
+                for (let t of this.targets) {
+                    t.pulsePhase += 0.05;
+                }
+
+                // Update explosions
+                this.explosions = this.explosions.filter(e => {
+                    e.x += e.vx;
+                    e.y += e.vy;
+                    e.vy += 0.2; // Gravity
+                    e.life--;
+                    return e.life > 0;
+                });
+
+                // Combo timeout
+                if (this.targets.length === 0 && this.combo > 0) {
+                    setTimeout(() => {
+                        if (this.targets.length === 0) this.combo = 0;
+                    }, 1000);
+                }
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('infinityBurstBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw targets
+                for (let t of this.targets) {
+                    const pulse = 1 + Math.sin(t.pulsePhase) * 0.2;
+                    this.ctx.fillStyle = t.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(t.x, t.y, t.radius * pulse, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw explosions
+                for (let e of this.explosions) {
+                    this.ctx.fillStyle = `rgba(${e.color}, ${e.life / 30})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Draw cursor
+                this.ctx.strokeStyle = '#ffaa00';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(this.mouseX, this.mouseY, 10, 0, Math.PI * 2);
+                this.ctx.stroke();
+
+                // HUD
+                this.ctx.fillStyle = '#ffaa00';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`COMBO: ${this.combo}`, 10, 25);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 50);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffaa00';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('combo').textContent = this.combo;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.targets = [];
+                this.explosions = [];
+                this.score = 0;
+                this.combo = 0;
+                this.maxCombo = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.spawnRate = 0;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

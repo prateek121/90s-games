@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEBULA COLLECTOR - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #001a4d, #000033);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ddff;
+            background: #000033;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 221, 255, 0.5);
+        }
+        .info {
+            color: #00ddff;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ddff;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ddff;
+            color: #000033;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 10px rgba(0, 221, 255, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #00ddff;">💫 NEBULA COLLECTOR 💫</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Collected: <span id="collected">0</span>/10 | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">Click to move collector • Gather all particles</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            collector: { x: 200, y: 550, width: 25, height: 25, targetX: 200, targetY: 550, speed: 4, radius: 30 },
+            particles: [],
+            nebulas: [],
+            collectibles: [],
+            enemies: [],
+            shields: 2,
+            score: 0,
+            level: 1,
+            collected: 0,
+            targetCollect: 10,
+            highScore: localStorage.getItem('nebulaCollectorHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            levelComplete: false,
+            levelCompleteTimer: 0,
+            frameCount: 0,
+            timeBonus: 0,
+            speedBoosts: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.collector = { x: 200, y: 550, width: 25, height: 25, targetX: 200, targetY: 550, speed: 4, radius: 30 };
+                this.particles = [];
+                this.nebulas = this.generateNebulas();
+                this.collectibles = this.spawnCollectibles();
+                this.enemies = this.spawnEnemies();
+                this.shields = 2;
+                this.score = 0;
+                this.level = 1;
+                this.collected = 0;
+                this.targetCollect = 10;
+                this.timeBonus = 0;
+                this.speedBoosts = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.levelComplete = false;
+                this.levelCompleteTimer = 0;
+                this.frameCount = 0;
+            },
+
+            spawnEnemies() {
+                const enemies = [];
+                for (let i = 0; i < 1 + this.level; i++) {
+                    enemies.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * (this.height - 100),
+                        radius: 8,
+                        vx: Math.random() * 2 - 1,
+                        vy: Math.random() * 2 - 1,
+                        speed: 1 + this.level * 0.3
+                    });
+                }
+                return enemies;
+            },
+
+            generateNebulas() {
+                const nebulas = [];
+                for (let i = 0; i < 3; i++) {
+                    nebulas.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * (this.height - 100),
+                        radius: 50 + Math.random() * 50,
+                        color: `hsla(${200 + i * 30}, 100%, 50%, 0.2)`,
+                        particles: []
+                    });
+                }
+                return nebulas;
+            },
+
+            spawnCollectibles() {
+                const collectibles = [];
+                for (let i = 0; i < this.targetCollect; i++) {
+                    let x, y, overlap;
+                    do {
+                        overlap = false;
+                        x = Math.random() * (this.width - 20) + 10;
+                        y = Math.random() * (this.height - 100 - 20) + 10;
+                        for (let c of collectibles) {
+                            if (Math.hypot(x - c.x, y - c.y) < 50) {
+                                overlap = true;
+                                break;
+                            }
+                        }
+                    } while (overlap);
+
+                    collectibles.push({
+                        x, y,
+                        radius: 5 + Math.random() * 3,
+                        color: `hsl(${Math.random() * 60 + 180}, 100%, 50%)`,
+                        collected: false
+                    });
+                }
+                return collectibles;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Move collector toward target
+                const dx = this.collector.targetX - this.collector.x;
+                const dy = this.collector.targetY - this.collector.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist > this.collector.speed) {
+                    this.collector.x += (dx / dist) * this.collector.speed;
+                    this.collector.y += (dy / dist) * this.collector.speed;
+                } else {
+                    this.collector.x = this.collector.targetX;
+                    this.collector.y = this.collector.targetY;
+                }
+
+                // Update enemies
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const enemy = this.enemies[i];
+                    enemy.x += enemy.vx * enemy.speed;
+                    enemy.y += enemy.vy * enemy.speed;
+
+                    if (enemy.x < enemy.radius || enemy.x > this.width - enemy.radius) enemy.vx *= -1;
+                    if (enemy.y < enemy.radius || enemy.y > this.height - enemy.radius) enemy.vy *= -1;
+
+                    // Enemy vs collector collision
+                    const dist = Math.hypot(this.collector.x - enemy.x, this.collector.y - enemy.y);
+                    if (dist < this.collector.width / 2 + enemy.radius) {
+                        this.shields--;
+                        if (this.shields <= 0) {
+                            this.endGame();
+                            return;
+                        }
+                        this.enemies.splice(i, 1);
+                        this.score = Math.max(0, this.score - 50);
+                    }
+                }
+
+                // Check collectible collision
+                for (let collectible of this.collectibles) {
+                    if (!collectible.collected) {
+                        const dist = Math.hypot(
+                            this.collector.x - collectible.x,
+                            this.collector.y - collectible.y
+                        );
+                        if (dist < this.collector.width / 2 + collectible.radius + 5) {
+                            collectible.collected = true;
+                            this.collected++;
+                            this.score += 100 * this.level;
+                            this.createCollectParticles(collectible);
+                        }
+                    }
+                }
+
+                // Particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                // Level complete check
+                if (this.collected === this.targetCollect) {
+                    this.levelComplete = true;
+                    this.levelCompleteTimer = 30;
+                    this.score += 500 * this.level;
+                    this.shields = Math.min(5, this.shields + 1);
+                    this.level++;
+                    this.collected = 0;
+                }
+
+                if (this.levelComplete) {
+                    this.levelCompleteTimer--;
+                    if (this.levelCompleteTimer === 0) {
+                        this.nebulas = this.generateNebulas();
+                        this.collectibles = this.spawnCollectibles();
+                        this.enemies = this.spawnEnemies();
+                        this.levelComplete = false;
+                    }
+                }
+
+                this.frameCount++;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('collected').textContent = this.collected;
+            },
+
+            createCollectParticles(collectible) {
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    this.particles.push({
+                        x: collectible.x,
+                        y: collectible.y,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        life: 20,
+                        color: collectible.color
+                    });
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Space background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#001a4d');
+                gradient.addColorStop(1, '#000033');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Stars
+                this.ctx.fillStyle = '#ffffff';
+                for (let i = 0; i < 20; i++) {
+                    const x = (this.frameCount * 0.05 + i * 20) % this.width;
+                    const y = (i * 30) % this.height;
+                    this.ctx.fillRect(x, y, 1, 1);
+                }
+
+                // Nebulas
+                for (let nebula of this.nebulas) {
+                    const gradient = this.ctx.createRadialGradient(nebula.x, nebula.y, 0, nebula.x, nebula.y, nebula.radius);
+                    gradient.addColorStop(0, `hsla(${200}, 100%, 50%, 0.4)`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(nebula.x, nebula.y, nebula.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Enemies
+                this.ctx.fillStyle = '#ff6b6b';
+                for (let enemy of this.enemies) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Collectibles
+                for (let collectible of this.collectibles) {
+                    if (!collectible.collected) {
+                        this.ctx.fillStyle = collectible.color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(collectible.x, collectible.y, collectible.radius, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        // Glow
+                        this.ctx.strokeStyle = collectible.color;
+                        this.ctx.lineWidth = 1;
+                        this.ctx.globalAlpha = 0.5;
+                        this.ctx.beginPath();
+                        this.ctx.arc(collectible.x, collectible.y, collectible.radius + 5, 0, Math.PI * 2);
+                        this.ctx.stroke();
+                        this.ctx.globalAlpha = 1;
+                    }
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 20;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Collector
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.collector.x, this.collector.y, this.collector.width / 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#00aaff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // Collection indicator and shields
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.font = 'bold 16px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`${this.collected}/${this.targetCollect}`, this.collector.x, this.collector.y - 25);
+
+                // Shield indicator
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.textAlign = 'left';
+                for (let i = 0; i < this.shields; i++) {
+                    this.ctx.fillRect(10 + i * 15, 10, 12, 12);
+                }
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.fillText(`Level: ${this.level}`, 10, 40);
+
+                if (this.levelComplete) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('COLLECTION COMPLETE!', this.width / 2, this.height / 2 - 20);
+                    this.ctx.font = '16px Arial';
+                    this.ctx.fillText(`Level ${this.level}`, this.width / 2, this.height / 2 + 20);
+                }
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ddff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('nebulaCollectorHigh', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            },
+
+            setupInput() {
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.collector.targetX = e.clientX - rect.left;
+                    this.collector.targetY = e.clientY - rect.top;
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        this.togglePause();
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRYSTAL FUSION - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a0033, #330066);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: #ff00ff;
+            text-shadow: 0 0 15px #ff00ff;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        canvas#gameCanvas {
+            border: 4px solid #ff00ff;
+            background: linear-gradient(135deg, #1a0033, #330066);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 25px rgba(255, 0, 255, 0.4);
+        }
+        .info {
+            color: #ff00ff;
+            margin-top: 20px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff00ff;
+            text-shadow: 0 0 15px #ff00ff;
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #cc00cc;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ff00ff;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        button:hover { background: #ff33ff; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💎 CRYSTAL FUSION 💎</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>CLICK to select and swap tiles</p>
+                <p>Match 3+ crystals horizontally or vertically!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            gridSize: 5,
+            tileSize: 60,
+            board: [],
+            selectedTile: null,
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            moves: 10,
+            animating: false,
+            colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.board = [];
+                this.selectedTile = null;
+                this.score = 0;
+                this.moves = 10;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.animating = false;
+
+                // Initialize board
+                for (let y = 0; y < this.gridSize; y++) {
+                    this.board[y] = [];
+                    for (let x = 0; x < this.gridSize; x++) {
+                        this.board[y][x] = {
+                            color: Math.floor(Math.random() * this.colors.length),
+                            x: x,
+                            y: y
+                        };
+                    }
+                }
+
+                this.removeMatches();
+            },
+
+            getTilePosition(x, y) {
+                const startX = (this.width - this.gridSize * this.tileSize) / 2;
+                const startY = (this.height - this.gridSize * this.tileSize) / 2;
+                return {
+                    x: startX + x * this.tileSize,
+                    y: startY + y * this.tileSize
+                };
+            },
+
+            getTileFromMouse(mouseX, mouseY) {
+                const startX = (this.width - this.gridSize * this.tileSize) / 2;
+                const startY = (this.height - this.gridSize * this.tileSize) / 2;
+
+                const x = Math.floor((mouseX - startX) / this.tileSize);
+                const y = Math.floor((mouseY - startY) / this.tileSize);
+
+                if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
+                    return { x, y };
+                }
+                return null;
+            },
+
+            swapTiles(tile1, tile2) {
+                const temp = this.board[tile1.y][tile1.x];
+                this.board[tile1.y][tile1.x] = this.board[tile2.y][tile2.x];
+                this.board[tile2.y][tile2.x] = temp;
+            },
+
+            removeMatches() {
+                let matched = false;
+
+                for (let y = 0; y < this.gridSize; y++) {
+                    for (let x = 0; x < this.gridSize; x++) {
+                        // Check horizontal
+                        if (x + 2 < this.gridSize) {
+                            if (this.board[y][x].color === this.board[y][x + 1].color &&
+                                this.board[y][x].color === this.board[y][x + 2].color) {
+                                this.board[y][x].matched = true;
+                                this.board[y][x + 1].matched = true;
+                                this.board[y][x + 2].matched = true;
+                                matched = true;
+                            }
+                        }
+
+                        // Check vertical
+                        if (y + 2 < this.gridSize) {
+                            if (this.board[y][x].color === this.board[y + 1][x].color &&
+                                this.board[y][x].color === this.board[y + 2][x].color) {
+                                this.board[y][x].matched = true;
+                                this.board[y + 1][x].matched = true;
+                                this.board[y + 2][x].matched = true;
+                                matched = true;
+                            }
+                        }
+                    }
+                }
+
+                if (matched) {
+                    for (let y = 0; y < this.gridSize; y++) {
+                        for (let x = 0; x < this.gridSize; x++) {
+                            if (this.board[y][x].matched) {
+                                this.board[y][x] = {
+                                    color: Math.floor(Math.random() * this.colors.length),
+                                    x: x,
+                                    y: y
+                                };
+                                this.score += 10;
+                            }
+                        }
+                    }
+                    this.removeMatches();
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                if (this.moves <= 0) {
+                    this.endGame();
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                this.ctx.fillStyle = '#1a0033';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw particles
+                for (let i = 0; i < 20; i++) {
+                    this.ctx.fillStyle = `rgba(255, 0, 255, ${0.3 * (1 - i / 20)})`;
+                    const x = (i * 50 + Math.sin(performance.now() / 1000 + i) * 30) % this.width;
+                    const y = (i * 30 + Math.cos(performance.now() / 1000 + i) * 30) % this.height;
+                    this.ctx.fillRect(x, y, 3, 3);
+                }
+
+                const startX = (this.width - this.gridSize * this.tileSize) / 2;
+                const startY = (this.height - this.gridSize * this.tileSize) / 2;
+
+                // Draw grid
+                this.ctx.strokeStyle = '#ff00ff';
+                this.ctx.lineWidth = 2;
+                for (let i = 0; i <= this.gridSize; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(startX, startY + i * this.tileSize);
+                    this.ctx.lineTo(startX + this.gridSize * this.tileSize, startY + i * this.tileSize);
+                    this.ctx.stroke();
+
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(startX + i * this.tileSize, startY);
+                    this.ctx.lineTo(startX + i * this.tileSize, startY + this.gridSize * this.tileSize);
+                    this.ctx.stroke();
+                }
+
+                // Draw tiles
+                for (let y = 0; y < this.gridSize; y++) {
+                    for (let x = 0; x < this.gridSize; x++) {
+                        const tile = this.board[y][x];
+                        const pos = this.getTilePosition(x, y);
+
+                        this.ctx.fillStyle = this.colors[tile.color];
+                        this.ctx.fillRect(pos.x + 2, pos.y + 2, this.tileSize - 4, this.tileSize - 4);
+
+                        if (this.selectedTile && this.selectedTile.x === x && this.selectedTile.y === y) {
+                            this.ctx.strokeStyle = '#ffff00';
+                            this.ctx.lineWidth = 4;
+                            this.ctx.strokeRect(pos.x + 2, pos.y + 2, this.tileSize - 4, this.tileSize - 4);
+                        }
+
+                        // Shine effect
+                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                        this.ctx.fillRect(pos.x + 4, pos.y + 4, 15, 15);
+                    }
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = 'bold 18px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 20, 30);
+                this.ctx.fillText(`Moves: ${this.moves}`, 20, 60);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff00ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff00ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 30);
+                    this.ctx.font = '18px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 30);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const tile = this.getTileFromMouse(x, y);
+                    if (!tile) return;
+
+                    if (!this.selectedTile) {
+                        this.selectedTile = tile;
+                    } else {
+                        const dx = Math.abs(tile.x - this.selectedTile.x);
+                        const dy = Math.abs(tile.y - this.selectedTile.y);
+
+                        if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+                            this.swapTiles(this.selectedTile, tile);
+                            this.removeMatches();
+                            this.moves--;
+                        }
+                        this.selectedTile = null;
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Marathon - Puzzle Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #2d1a4d 0%, #4d1a4d 100%);
+            font-family: 'Arial', sans-serif;
+            color: #ff00ff;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 15px #ff00ff;
+            border: 3px solid #ff00ff;
+            padding: 20px 40px;
+            background: rgba(255, 0, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            font-size: 1.3em;
+        }
+
+        .stat {
+            border: 2px solid #ff00ff;
+            padding: 12px 25px;
+            background: rgba(255, 0, 255, 0.05);
+        }
+
+        .stat span {
+            color: #ffff00;
+            font-weight: bold;
+        }
+
+        #canvas {
+            border: 3px solid #ff00ff;
+            background: #1a0a2e;
+            cursor: text;
+            box-shadow: 0 0 25px rgba(255, 0, 255, 0.4);
+        }
+
+        .problem {
+            text-align: center;
+            font-size: 2em;
+            border: 2px solid #ff00ff;
+            padding: 20px;
+            background: rgba(255, 0, 255, 0.05);
+            width: 400px;
+            color: #00ffff;
+        }
+
+        .answer-input {
+            width: 300px;
+            padding: 15px;
+            font-size: 1.5em;
+            text-align: center;
+            background: #000;
+            border: 2px solid #ff00ff;
+            color: #ffff00;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+
+        .answer-input:focus {
+            outline: none;
+            box-shadow: 0 0 15px #ff00ff;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #ff00ff, #ff0088);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.6);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .message {
+            min-height: 25px;
+            font-size: 1.2em;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff0000;
+        }
+
+        .combo {
+            font-size: 1.5em;
+            color: #ffff00;
+            text-shadow: 0 0 10px #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>MATH MARATHON</h1>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Combo: <span id="combo">0</span></div>
+            <div class="stat">Time: <span id="time">60</span>s</div>
+        </div>
+        <div class="problem" id="problem">0 + 0</div>
+        <input type="text" id="answer" class="answer-input" placeholder="Enter answer" autocomplete="off">
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+            <button onclick="game.togglePause()">Pause</button>
+        </div>
+    </div>
+
+    <script>
+        class MathMarathon {
+            constructor() {
+                this.score = 0;
+                this.combo = 0;
+                this.maxCombo = 0;
+                this.timeLeft = 60;
+                this.gameActive = true;
+                this.isPaused = false;
+                this.problemCount = 0;
+                this.correctCount = 0;
+
+                this.answerInput = document.getElementById('answer');
+                this.problemEl = document.getElementById('problem');
+
+                this.init();
+                this.setupEventListeners();
+                this.startTimer();
+            }
+
+            init() {
+                this.generateProblem();
+                this.answerInput.value = '';
+                this.answerInput.focus();
+            }
+
+            generateProblem() {
+                const difficulty = Math.min(5, 1 + Math.floor(this.score / 500));
+                const maxNum = 10 + difficulty * 15;
+                const minNum = 1;
+
+                const operations = ['+', '-', '*', '/'];
+                const op = operations[Math.floor(Math.random() * operations.length)];
+
+                let a = Math.floor(Math.random() * (maxNum - minNum + 1)) + minNum;
+                let b = Math.floor(Math.random() * (maxNum - minNum + 1)) + minNum;
+
+                // Ensure valid division
+                if (op === '/') {
+                    b = Math.floor(Math.random() * 9) + 1;
+                    a = b * Math.floor(Math.random() * 10 + 1);
+                }
+
+                // Avoid negative results for subtraction
+                if (op === '-' && a < b) {
+                    [a, b] = [b, a];
+                }
+
+                this.currentProblem = `${a} ${op} ${b}`;
+                this.currentAnswer = Math.floor(eval(this.currentProblem));
+                this.problemEl.textContent = this.currentProblem;
+            }
+
+            setupEventListeners() {
+                this.answerInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.checkAnswer();
+                    }
+                });
+
+                this.answerInput.addEventListener('blur', () => {
+                    if (this.gameActive && !this.isPaused) {
+                        this.answerInput.focus();
+                    }
+                });
+            }
+
+            checkAnswer() {
+                if (!this.gameActive || this.isPaused) return;
+
+                const userAnswer = parseInt(this.answerInput.value);
+                this.problemCount++;
+
+                const messageEl = document.getElementById('message');
+
+                if (userAnswer === this.currentAnswer) {
+                    this.combo++;
+                    this.maxCombo = Math.max(this.maxCombo, this.combo);
+                    this.correctCount++;
+
+                    const basePoints = 10;
+                    const bonusPoints = Math.floor(this.combo * 5);
+                    this.score += basePoints + bonusPoints;
+
+                    messageEl.textContent = `Correct! +${basePoints + bonusPoints} points (x${this.combo} combo)`;
+                    messageEl.className = 'message success';
+
+                    this.answerInput.style.borderColor = '#00ff00';
+                    setTimeout(() => {
+                        this.answerInput.style.borderColor = '#ff00ff';
+                    }, 200);
+                } else {
+                    this.combo = 0;
+                    messageEl.textContent = `Wrong! Answer was ${this.currentAnswer}`;
+                    messageEl.className = 'message error';
+
+                    this.answerInput.style.borderColor = '#ff0000';
+                    setTimeout(() => {
+                        this.answerInput.style.borderColor = '#ff00ff';
+                    }, 300);
+                }
+
+                this.updateUI();
+                this.generateProblem();
+                this.answerInput.value = '';
+                this.answerInput.focus();
+            }
+
+            startTimer() {
+                setInterval(() => {
+                    if (!this.isPaused && this.gameActive) {
+                        this.timeLeft--;
+                        document.getElementById('time').textContent = this.timeLeft;
+
+                        if (this.timeLeft <= 0) {
+                            this.endGame();
+                        }
+                    }
+                }, 1000);
+            }
+
+            endGame() {
+                this.gameActive = false;
+                this.answerInput.disabled = true;
+                const accuracy = this.problemCount > 0 ? Math.round((this.correctCount / this.problemCount) * 100) : 0;
+                document.getElementById('message').textContent =
+                    `Game Over! Score: ${this.score} | Accuracy: ${accuracy}% | Max Combo: ${this.maxCombo}`;
+                document.getElementById('message').className = 'message success';
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+                if (this.isPaused) {
+                    this.answerInput.disabled = true;
+                    document.getElementById('message').textContent = 'PAUSED';
+                    document.getElementById('message').className = 'message error';
+                } else {
+                    this.answerInput.disabled = false;
+                    document.getElementById('message').textContent = '';
+                    this.answerInput.focus();
+                }
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('combo').textContent = this.combo;
+            }
+
+            reset() {
+                this.score = 0;
+                this.combo = 0;
+                this.maxCombo = 0;
+                this.timeLeft = 60;
+                this.gameActive = true;
+                this.isPaused = false;
+                this.problemCount = 0;
+                this.correctCount = 0;
+                this.answerInput.disabled = false;
+                this.answerInput.style.borderColor = '#ff00ff';
+                document.getElementById('message').textContent = '';
+                this.updateUI();
+                this.init();
+            }
+        }
+
+        const game = new MathMarathon();
+
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('mathMarathonHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('mathMarathonHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

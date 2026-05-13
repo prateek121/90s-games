@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EARTHQUAKE SURVIVAL - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #8b6f47, #5d4b38);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #d4a574, #8b6f47);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(200, 100, 0, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #eee; }
+        button {
+            padding: 8px 16px;
+            background: #cc6600;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #ee8800; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⛏️ EARTHQUAKE SURVIVAL ⛏️</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>LEFT/RIGHT ARROW or A/D to move</p>
+                <p>Avoid falling rocks during earthquakes!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 175, y: 550, width: 30, height: 30, speed: 5 },
+            rocks: [],
+            cracks: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            earthquakeIntensity: 0,
+            highScore: localStorage.getItem('earthquake-survival-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 550, width: 30, height: 30, speed: 5 };
+                this.rocks = [];
+                this.cracks = [];
+                this.score = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+                this.earthquakeIntensity = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Handle input
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    if (this.player.x > 0) this.player.x -= this.player.speed;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    if (this.player.x + this.player.width < this.width) this.player.x += this.player.speed;
+                }
+
+                // Spawn rocks
+                this.frameCount++;
+                const spawnRate = Math.max(20, 50 - Math.floor(this.score / 100) * 3);
+                if (this.frameCount % spawnRate === 0) {
+                    const size = 15 + Math.random() * 30;
+                    this.rocks.push({
+                        x: Math.random() * (this.width - size),
+                        y: -size,
+                        size: size,
+                        vy: 3 + this.score / 200,
+                        rotation: Math.random() * Math.PI * 2,
+                        rotationSpeed: (Math.random() - 0.5) * 0.3
+                    });
+                }
+
+                // Earthquake waves
+                if (this.score % 50 === 0 && this.score > 0) {
+                    this.earthquakeIntensity = 5;
+                }
+
+                // Create cracks during earthquakes
+                if (this.earthquakeIntensity > 0) {
+                    if (Math.random() > 0.9) {
+                        this.cracks.push({
+                            x: Math.random() * this.width,
+                            y: this.height - 30,
+                            width: 20 + Math.random() * 30,
+                            height: 3,
+                            life: 20,
+                            maxLife: 20
+                        });
+                    }
+                }
+                this.earthquakeIntensity *= 0.95;
+
+                // Update rocks
+                for (let i = this.rocks.length - 1; i >= 0; i--) {
+                    const rock = this.rocks[i];
+                    rock.y += rock.vy;
+                    rock.rotation += rock.rotationSpeed;
+
+                    if (rock.y > this.height) {
+                        this.rocks.splice(i, 1);
+                        this.score++;
+                    } else {
+                        if (this.checkCollision(this.player, rock)) {
+                            this.endGame();
+                        }
+                    }
+                }
+
+                // Update cracks
+                for (let i = this.cracks.length - 1; i >= 0; i--) {
+                    this.cracks[i].life--;
+                    if (this.cracks[i].life <= 0) {
+                        this.cracks.splice(i, 1);
+                    }
+                }
+            },
+
+            checkCollision(rect, rock) {
+                const distance = Math.sqrt(
+                    Math.pow((rect.x + rect.width / 2) - (rock.x + rock.size / 2), 2) +
+                    Math.pow((rect.y + rect.height / 2) - (rock.y + rock.size / 2), 2)
+                );
+                return distance < (rect.width / 2 + rock.size / 2);
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('earthquake-survival-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                let offsetX = 0, offsetY = 0;
+                if (this.earthquakeIntensity > 0) {
+                    offsetX = (Math.random() - 0.5) * this.earthquakeIntensity * 4;
+                    offsetY = (Math.random() - 0.5) * this.earthquakeIntensity * 4;
+                }
+
+                this.ctx.save();
+                this.ctx.translate(offsetX, offsetY);
+
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#d4a574');
+                gradient.addColorStop(1, '#8b6f47');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw ground
+                this.ctx.fillStyle = '#8b6f47';
+                this.ctx.fillRect(0, this.height - 40, this.width, 40);
+
+                // Draw cracks
+                for (let crack of this.cracks) {
+                    this.ctx.strokeStyle = `rgba(0, 0, 0, ${crack.life / crack.maxLife})`;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(crack.x, crack.y);
+                    this.ctx.lineTo(crack.x + crack.width, crack.y);
+                    this.ctx.stroke();
+                }
+
+                // Draw rocks
+                for (let rock of this.rocks) {
+                    this.ctx.save();
+                    this.ctx.translate(rock.x + rock.size / 2, rock.y + rock.size / 2);
+                    this.ctx.rotate(rock.rotation);
+
+                    // Rock body
+                    this.ctx.fillStyle = '#664422';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, rock.size / 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Rock edges
+                    this.ctx.strokeStyle = '#442211';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+
+                    this.ctx.restore();
+                }
+
+                // Draw player
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.strokeStyle = '#00dd00';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.fillStyle = '#00dd00';
+                this.ctx.fillRect(this.player.x + 8, this.player.y + 8, 6, 6);
+
+                // Score and info
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+
+                this.ctx.restore();
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

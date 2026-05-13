@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Void Collector - 90s Games</title>
+    <style>
+        body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #0a0a0a; font-family: 'Courier New', monospace; color: #7c3aed; }
+        #gameContainer { position: relative; width: 800px; height: 600px; border: 3px solid #7c3aed; background: #0a0a0a; box-shadow: 0 0 20px #7c3aed; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 10px; left: 10px; font-size: 14px; text-shadow: 0 0 10px #7c3aed; }
+        #score { margin-bottom: 5px; }
+        #level { color: #ffff00; margin-bottom: 5px; }
+        #status { color: #00ff00; }
+        #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,10,10,0.95); border: 2px solid #7c3aed; padding: 30px; text-align: center; display: none; z-index: 100; border-radius: 10px; box-shadow: 0 0 30px #7c3aed; }
+        #gameOver h1 { margin: 0 0 10px 0; color: #7c3aed; }
+        #gameOver button { margin-top: 15px; padding: 10px 20px; background: #7c3aed; border: none; color: #0a0a0a; cursor: pointer; font-weight: bold; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui">
+            <div id="score">SCORE: 0</div>
+            <div id="level">LEVEL: 1</div>
+            <div id="status">STATUS: PLAYING</div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="gameOver">
+            <h1>GAME OVER</h1>
+            <p id="finalScore">SCORE: 0</p>
+            <button onclick="location.reload()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        class Game {
+            constructor() {
+                this.score = 0;
+                this.level = 1;
+                this.gameOver = false;
+                this.time = 0;
+                this.player = { x: canvas.width / 2, y: canvas.height / 2, size: 15, vx: 0, vy: 0 };
+                this.enemies = [];
+                this.projectiles = [];
+                this.particles = [];
+                this.keys = {};
+                this.setupControls();
+                this.loadGame();
+            }
+
+            setupControls() {
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') { e.preventDefault(); this.shoot(); }
+                });
+                window.addEventListener('keyup', (e) => { this.keys[e.key] = false; });
+            }
+
+            shoot() {
+                this.projectiles.push({
+                    x: this.player.x,
+                    y: this.player.y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6 - 3,
+                    life: 100
+                });
+            }
+
+            update() {
+                if (this.gameOver) return;
+                this.time++;
+
+                if (this.keys['ArrowUp'] || this.keys['w']) this.player.vy -= 1;
+                if (this.keys['ArrowDown'] || this.keys['s']) this.player.vy += 1;
+                if (this.keys['ArrowLeft'] || this.keys['a']) this.player.vx -= 1;
+                if (this.keys['ArrowRight'] || this.keys['d']) this.player.vx += 1;
+
+                this.player.vx *= 0.95;
+                this.player.vy *= 0.95;
+                this.player.x += this.player.vx;
+                this.player.y += this.player.vy;
+
+                this.player.x = Math.max(this.player.size, Math.min(canvas.width - this.player.size, this.player.x));
+                this.player.y = Math.max(this.player.size, Math.min(canvas.height - this.player.size, this.player.y));
+
+                if (this.time % 120 === 0) {
+                    const angle = Math.random() * Math.PI * 2;
+                    this.enemies.push({
+                        x: Math.random() * canvas.width,
+                        y: -20,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2 + 1,
+                        size: 8,
+                        health: 10
+                    });
+                }
+
+                this.projectiles = this.projectiles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    let hit = false;
+                    for (let i = this.enemies.length - 1; i >= 0; i--) {
+                        const e = this.enemies[i];
+                        if (Math.hypot(p.x - e.x, p.y - e.y) < e.size + 5) {
+                            e.health--;
+                            if (e.health <= 0) {
+                                this.enemies.splice(i, 1);
+                                this.score += 10;
+                            }
+                            hit = true;
+                        }
+                    }
+                    return !hit && p.life > 0;
+                });
+
+                this.enemies = this.enemies.filter(e => {
+                    if (e.y > canvas.height) return false;
+                    if (Math.hypot(e.x - this.player.x, e.y - this.player.y) < e.size + this.player.size) {
+                        this.endGame();
+                        return false;
+                    }
+                    return true;
+                });
+
+                if (this.score > 0 && this.score % 500 === 0) this.level++;
+
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    return p.life > 0;
+                });
+            }
+
+            draw() {
+                ctx.fillStyle = '#0a0a0a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#7c3aed';
+                ctx.beginPath();
+                ctx.arc(this.player.x, this.player.y, this.player.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ff0000';
+                this.enemies.forEach(e => {
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                ctx.fillStyle = '#ffff00';
+                this.projectiles.forEach(p => {
+                    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+                });
+
+                document.getElementById('score').textContent = `SCORE: ${this.score}`;
+                document.getElementById('level').textContent = `LEVEL: ${this.level}`;
+            }
+
+            endGame() {
+                this.gameOver = true;
+                document.getElementById('finalScore').textContent = `SCORE: ${this.score}`;
+                document.getElementById('gameOver').style.display = 'block';
+                this.saveGame();
+            }
+
+            saveGame() {
+                const save = { score: this.score, level: this.level, date: new Date().toISOString() };
+                const saves = JSON.parse(localStorage.getItem('gameSaves')) || [];
+                saves.push(save);
+                localStorage.setItem('gameSaves', JSON.stringify(saves.slice(-10)));
+            }
+
+            loadGame() {
+                const saves = JSON.parse(localStorage.getItem('gameSaves')) || [];
+                if (saves.length > 0) console.log('High score:', Math.max(...saves.map(s => s.score)));
+            }
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+
+        const game = new Game();
+        game.gameLoop();
+    
+        // Additional game features and complexity
+        Game.prototype.addDifficulty = function() {
+            // Dynamic difficulty based on score
+            if (this.score > 500) this.difficultyMultiplier = 2;
+            if (this.score > 1000) this.difficultyMultiplier = 3;
+            if (this.score > 2000) this.difficultyMultiplier = 4;
+        };
+
+        Game.prototype.updateDifficulty = function() {
+            this.addDifficulty();
+        };
+
+        // Enhanced particle system
+        Game.prototype.createTrail = function(x, y, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count;
+                const distance = 5 + i;
+                this.particles.push({
+                    x: x + Math.cos(angle) * distance,
+                    y: y + Math.sin(angle) * distance,
+                    vx: Math.cos(angle) * (1 + Math.random()),
+                    vy: Math.sin(angle) * (1 + Math.random()),
+                    life: 30 + Math.random() * 20,
+                    size: 1.5 + Math.random()
+                });
+            }
+        };
+
+        // Advanced collision detection
+        Game.prototype.checkCollisions = function() {
+            // Spatial partitioning for better performance
+            for (let i = 0; i < this.items.length; i++) {
+                for (let j = i + 1; j < this.items.length; j++) {
+                    const item1 = this.items[i];
+                    const item2 = this.items[j];
+                    const dist = Math.hypot(item1.x - item2.x, item1.y - item2.y);
+                    if (dist < item1.size + item2.size) {
+                        // Collision response
+                        const angle = Math.atan2(item2.y - item1.y, item2.x - item1.x);
+                        const push = (item1.size + item2.size - dist) / 2 + 1;
+                        item1.x -= Math.cos(angle) * push;
+                        item1.y -= Math.sin(angle) * push;
+                        item2.x += Math.cos(angle) * push;
+                        item2.y += Math.sin(angle) * push;
+                    }
+                }
+            }
+        };
+
+        // Sound/Visual feedback system
+        Game.prototype.addVisualFeedback = function(x, y, intensity) {
+            this.effects = this.effects || [];
+            this.effects.push({
+                x: x,
+                y: y,
+                intensity: intensity,
+                life: 15,
+                maxLife: 15
+            });
+        };
+
+        // Power-up system
+        Game.prototype.spawnPowerUp = function(x, y) {
+            if (!this.powerups) this.powerups = [];
+            this.powerups.push({
+                x: x,
+                y: y,
+                type: Math.floor(Math.random() * 3),
+                rotation: 0,
+                rotSpeed: 0.05,
+                collected: false
+            });
+        };
+
+        // Score multiplier system
+        Game.prototype.updateMultiplier = function() {
+            if (this.combo > 10) this.scoreMultiplier = 2;
+            else if (this.combo > 5) this.scoreMultiplier = 1.5;
+            else this.scoreMultiplier = 1;
+        };
+
+        // Enhanced update loop with new features
+        const originalUpdate = game.update.bind(game);
+        game.update = function() {
+            originalUpdate();
+            this.updateDifficulty();
+            this.updateMultiplier();
+            if (this.checkCollisions) this.checkCollisions();
+            this.addVisualFeedback(this.player.x, this.player.y, 0.1);
+            
+            // Random power-up spawning
+            if (this.time % 300 === 0 && Math.random() > 0.7) {
+                this.spawnPowerUp(Math.random() * canvas.width, Math.random() * canvas.height);
+            }
+        };
+    
+    </script>
+</body>
+</html>

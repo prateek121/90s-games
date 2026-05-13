@@ -1,0 +1,2038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>90s Games Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 3.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: 2px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .game-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            transform: translateY(0);
+        }
+
+        .game-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-preview {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 4em;
+            font-weight: bold;
+        }
+
+        .game-info {
+            padding: 20px;
+        }
+
+        .game-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .game-description {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+
+        .game-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #999;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .play-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .play-btn:active {
+            transform: scale(0.98);
+        }
+
+        .stats-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 12px;
+            color: white;
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 90s GAMES COLLECTION 🎮</h1>
+            <p class="subtitle">114+ Classic Games Reimagined for the Web</p>
+        </header>
+
+        <div class="games-grid">
+            <!-- 2048 -->
+            <a href="games/2048.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">2️⃣</div>
+                    <div class="game-info">
+                        <div class="game-title">2048</div>
+                        <div class="game-description">Combine numbers to reach 2048. Strategic sliding puzzle!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- 8Bit Quest -->
+            <a href="games/8bit-quest.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎮</div>
+                    <div class="game-info">
+                        <div class="game-title">8Bit Quest</div>
+                        <div class="game-description">Retro adventure in a pixel world. Classic quest action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Agar -->
+            <a href="games/agar.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🟢</div>
+                    <div class="game-info">
+                        <div class="game-title">Agar</div>
+                        <div class="game-description">Grow your cell by eating others. Avoid bigger players!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo/Multi</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Apex Predator -->
+            <a href="games/apex-predator.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🦁</div>
+                    <div class="game-info">
+                        <div class="game-title">Apex Predator</div>
+                        <div class="game-description">Hunt prey and survive. Climb the food chain!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Arcade Classic -->
+            <a href="games/arcade-classic.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🕹️</div>
+                    <div class="game-info">
+                        <div class="game-title">Arcade Classic</div>
+                        <div class="game-description">The best of arcade games in one experience!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Arcade Fever -->
+            <a href="games/arcade-fever.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎰</div>
+                    <div class="game-info">
+                        <div class="game-title">Arcade Fever</div>
+                        <div class="game-description">Fast-paced arcade action and excitement!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Asteroids -->
+            <a href="games/asteroids.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💫</div>
+                    <div class="game-info">
+                        <div class="game-title">Asteroids</div>
+                        <div class="game-description">Destroy asteroids and avoid collisions. Classic arcade action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Aurora Burst -->
+            <a href="games/aurora-burst.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">✨</div>
+                    <div class="game-info">
+                        <div class="game-title">Aurora Burst</div>
+                        <div class="game-description">Create beautiful bursts of light and color!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Aurora Dance -->
+            <a href="games/aurora-dance.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌌</div>
+                    <div class="game-info">
+                        <div class="game-title">Aurora Dance</div>
+                        <div class="game-description">Match falling colors with your shield! Color matching fun!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Binary Blast -->
+            <a href="games/binary-blast.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💻</div>
+                    <div class="game-info">
+                        <div class="game-title">Binary Blast</div>
+                        <div class="game-description">Fast-paced coding and logic action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Block Squad -->
+            <a href="games/block-squad.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🧱</div>
+                    <div class="game-info">
+                        <div class="game-title">Block Squad</div>
+                        <div class="game-description">Match blocks and clear the board. Puzzle action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Bounce Palace -->
+            <a href="games/bounce-palace.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎪</div>
+                    <div class="game-info">
+                        <div class="game-title">Bounce Palace</div>
+                        <div class="game-description">Keep the ball bouncing on platforms. Don't let it fall!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Breakout -->
+            <a href="games/breakout.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🧱</div>
+                    <div class="game-info">
+                        <div class="game-title">Breakout</div>
+                        <div class="game-description">Bounce the ball and break all the bricks. Grab power-ups!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Brick Blaster -->
+            <a href="games/brick-blaster.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚡</div>
+                    <div class="game-info">
+                        <div class="game-title">Brick Blaster</div>
+                        <div class="game-description">Aim and fire balls to destroy bricks. Physics-based action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 10+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Bullet Hell -->
+            <a href="games/bullet-hell.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔥</div>
+                    <div class="game-info">
+                        <div class="game-title">Bullet Hell</div>
+                        <div class="game-description">Dodge intense bullet patterns. Extreme difficulty!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Cartridge Dash -->
+            <a href="games/cartridge-dash.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🕹️</div>
+                    <div class="game-info">
+                        <div class="game-title">Cartridge Dash</div>
+                        <div class="game-description">Fast-running action game. Classic arcade vibes!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Cassette Quest -->
+            <a href="games/cassette-quest.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">📼</div>
+                    <div class="game-info">
+                        <div class="game-title">Cassette Quest</div>
+                        <div class="game-description">Adventure through a retro tape-based world!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Chain Reaction -->
+            <a href="games/chain-reaction.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚛️</div>
+                    <div class="game-info">
+                        <div class="game-title">Chain Reaction</div>
+                        <div class="game-description">Create chain reactions for massive combos!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Chip Tune Battle -->
+            <a href="games/chip-tune-battle.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎵</div>
+                    <div class="game-info">
+                        <div class="game-title">Chip Tune Battle</div>
+                        <div class="game-description">Battle with chiptune music and retro sounds!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Chrono Jump -->
+            <a href="games/chrono-jump.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⏰</div>
+                    <div class="game-info">
+                        <div class="game-title">Chrono Jump</div>
+                        <div class="game-description">Jump through time and space. Temporal puzzle action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Cipher Crack -->
+            <a href="games/cipher-crack.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔐</div>
+                    <div class="game-info">
+                        <div class="game-title">Cipher Crack</div>
+                        <div class="game-description">Break codes and solve cryptic puzzles!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Code Runner -->
+            <a href="games/code-runner.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💾</div>
+                    <div class="game-info">
+                        <div class="game-title">Code Runner</div>
+                        <div class="game-description">Execute code and navigate digital worlds!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Color Match -->
+            <a href="games/color-match.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎨</div>
+                    <div class="game-info">
+                        <div class="game-title">Color Match</div>
+                        <div class="game-description">Match center color to surrounding bars. Timed challenge!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 1 min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Combo Master -->
+            <a href="games/combo-master.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎪</div>
+                    <div class="game-info">
+                        <div class="game-title">Combo Master</div>
+                        <div class="game-description">Build massive combos for huge scores!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Crystal Dash -->
+            <a href="games/crystal-dash.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💎</div>
+                    <div class="game-info">
+                        <div class="game-title">Crystal Dash</div>
+                        <div class="game-description">Collect crystals in a magical realm!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Crystal Fusion -->
+            <a href="games/crystal-fusion.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">✨</div>
+                    <div class="game-info">
+                        <div class="game-title">Crystal Fusion</div>
+                        <div class="game-description">Fuse crystals to create powerful gems!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Cyber Breach -->
+            <a href="games/cyber-breach.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🛡️</div>
+                    <div class="game-info">
+                        <div class="game-title">Cyber Breach</div>
+                        <div class="game-description">Hack systems and bypass security. Cyber action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Cyber Rush -->
+            <a href="games/cyber-rush.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💨</div>
+                    <div class="game-info">
+                        <div class="game-title">Cyber Rush</div>
+                        <div class="game-description">High-speed cyber racing action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Data Surge -->
+            <a href="games/data-surge.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">📊</div>
+                    <div class="game-info">
+                        <div class="game-title">Data Surge</div>
+                        <div class="game-description">Navigate digital data streams. Cyber surfing!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Digital Maze -->
+            <a href="games/digital-maze.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔲</div>
+                    <div class="game-info">
+                        <div class="game-title">Digital Maze</div>
+                        <div class="game-description">Navigate digital mazes. Cyber puzzle action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Earth Digger -->
+            <a href="games/earth-digger.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⛏️</div>
+                    <div class="game-info">
+                        <div class="game-title">Earth Digger</div>
+                        <div class="game-description">Mine resources and build your empire!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Earthquake Survival -->
+            <a href="games/earthquake-survival.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⛏️</div>
+                    <div class="game-info">
+                        <div class="game-title">Earthquake Survival</div>
+                        <div class="game-description">Avoid falling rocks during earthquakes!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Echo Sync -->
+            <a href="games/echo-sync.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔊</div>
+                    <div class="game-info">
+                        <div class="game-title">Echo Sync</div>
+                        <div class="game-description">Sync with audio echoes. Rhythm puzzle game!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Eclipse Runner -->
+            <a href="games/eclipse-runner.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌑</div>
+                    <div class="game-info">
+                        <div class="game-title">Eclipse Runner</div>
+                        <div class="game-description">Run through darkness and light. Celestial action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Fast Reflex -->
+            <a href="games/fast-reflex.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚡</div>
+                    <div class="game-info">
+                        <div class="game-title">Fast Reflex</div>
+                        <div class="game-description">Test your reaction speed. Lightning-fast gameplay!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 1+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Flappy Fall -->
+            <a href="games/flappy-fall.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⬇️</div>
+                    <div class="game-info">
+                        <div class="game-title">Flappy Fall</div>
+                        <div class="game-description">Fall through platforms without hitting walls. Speed falls!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Flappy -->
+            <a href="games/flappy.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🐦</div>
+                    <div class="game-info">
+                        <div class="game-title">Flappy</div>
+                        <div class="game-description">Tap to fly and avoid pipes. One wrong move = game over!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 2+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Flow State -->
+            <a href="games/flow-state.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌊</div>
+                    <div class="game-info">
+                        <div class="game-title">Flow State</div>
+                        <div class="game-description">Reach flow state through meditative gameplay!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Forest Guardian -->
+            <a href="games/forest-guardian.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌲</div>
+                    <div class="game-info">
+                        <div class="game-title">Forest Guardian</div>
+                        <div class="game-description">Protect the forest from invaders. Nature action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Frogger -->
+            <a href="games/frogger.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🐸</div>
+                    <div class="game-info">
+                        <div class="game-title">Frogger</div>
+                        <div class="game-description">Hop across traffic and rivers to reach the top. Timing is key!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Frost Maze -->
+            <a href="games/frost-maze.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">❄️</div>
+                    <div class="game-info">
+                        <div class="game-title">Frost Maze</div>
+                        <div class="game-description">Find the exit through the frozen maze!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Gravity Ball -->
+            <a href="games/gravity-ball.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌍</div>
+                    <div class="game-info">
+                        <div class="game-title">Gravity Ball</div>
+                        <div class="game-description">Navigate gravity fields and avoid black holes!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Hanoi -->
+            <a href="games/hanoi.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🗼</div>
+                    <div class="game-info">
+                        <div class="game-title">Tower Of Hanoi</div>
+                        <div class="game-description">Move stacks of disks between pegs. Classic puzzle game!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 10+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Hexagon Defense -->
+            <a href="games/hexagon-defense.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🛡️</div>
+                    <div class="game-info">
+                        <div class="game-title">Hexagon Defense</div>
+                        <div class="game-description">Defend the hexagon from incoming enemies. Tower defense action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Inferno Dash -->
+            <a href="games/inferno-dash.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔥</div>
+                    <div class="game-info">
+                        <div class="game-title">Inferno Dash</div>
+                        <div class="game-description">Dodge the lava and fire! Heat-powered action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Infinity Burst -->
+            <a href="games/infinity-burst.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">∞</div>
+                    <div class="game-info">
+                        <div class="game-title">Infinity Burst</div>
+                        <div class="game-description">Create infinite bursts of energy!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Jump Quest -->
+            <a href="games/jump-quest.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🦘</div>
+                    <div class="game-info">
+                        <div class="game-title">Jump Quest</div>
+                        <div class="game-description">Platformer action. Jump on platforms and avoid enemies!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Laser Defender -->
+            <a href="games/laser-defender.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔫</div>
+                    <div class="game-info">
+                        <div class="game-title">Laser Defender</div>
+                        <div class="game-description">Defend your base with lasers. Survive the waves!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Laser Grid -->
+            <a href="games/laser-grid.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">📐</div>
+                    <div class="game-info">
+                        <div class="game-title">Laser Grid</div>
+                        <div class="game-description">Navigate laser grids and avoid the beams!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Lightning Strike -->
+            <a href="games/lightning-strike.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚡</div>
+                    <div class="game-info">
+                        <div class="game-title">Lightning Strike</div>
+                        <div class="game-description">Don't let lightning bolts hit you!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Logic Gate -->
+            <a href="games/logic-gate.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔌</div>
+                    <div class="game-info">
+                        <div class="game-title">Logic Gate</div>
+                        <div class="game-description">Solve logic puzzles with gates and circuits!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Marble Run -->
+            <a href="games/marble-run.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔴</div>
+                    <div class="game-info">
+                        <div class="game-title">Marble Run</div>
+                        <div class="game-description">Tilt the board to guide marbles and collect stars!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Math Marathon -->
+            <a href="games/math-marathon.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🧮</div>
+                    <div class="game-info">
+                        <div class="game-title">Math Marathon</div>
+                        <div class="game-description">Solve math problems at top speed!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Matrix Trace -->
+            <a href="games/matrix-trace.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🟩</div>
+                    <div class="game-info">
+                        <div class="game-title">Matrix Trace</div>
+                        <div class="game-description">Navigate the digital matrix. Cyber action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Memory -->
+            <a href="games/memory.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🧠</div>
+                    <div class="game-info">
+                        <div class="game-title">Memory</div>
+                        <div class="game-description">Match pairs of cards. Test your memory and concentration!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Meteor Strike -->
+            <a href="games/meteor-strike.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">☄️</div>
+                    <div class="game-info">
+                        <div class="game-title">Meteor Strike</div>
+                        <div class="game-description">Dodge the falling meteors!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Minesweeper -->
+            <a href="games/minesweeper.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💣</div>
+                    <div class="game-info">
+                        <div class="game-title">Minesweeper</div>
+                        <div class="game-description">Reveal tiles without hitting mines. Use logic to win!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Minimalist Zen -->
+            <a href="games/minimalist-zen.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">☮️</div>
+                    <div class="game-info">
+                        <div class="game-title">Minimalist Zen</div>
+                        <div class="game-description">Find peace in minimalist puzzle gameplay!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Nature Collector -->
+            <a href="games/nature-collector.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌿</div>
+                    <div class="game-info">
+                        <div class="game-title">Nature Collector</div>
+                        <div class="game-description">Collect and discover nature specimens!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Nebula Collector -->
+            <a href="games/nebula-collector.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌌</div>
+                    <div class="game-info">
+                        <div class="game-title">Nebula Collector</div>
+                        <div class="game-description">Collect nebulae across the galaxy!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Neon Portal -->
+            <a href="games/neon-portal.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌀</div>
+                    <div class="game-info">
+                        <div class="game-title">Neon Portal</div>
+                        <div class="game-description">Travel through neon portals to other dimensions!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Neon Surge -->
+            <a href="games/neon-surge.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💡</div>
+                    <div class="game-info">
+                        <div class="game-title">Neon Surge</div>
+                        <div class="game-description">Ride the neon wave of energy!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Nexus Blocks -->
+            <a href="games/nexus-blocks.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔷</div>
+                    <div class="game-info">
+                        <div class="game-title">Nexus Blocks</div>
+                        <div class="game-description">Build and connect blocks in interconnected puzzles!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Nexus Painter -->
+            <a href="games/nexus-painter.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎨</div>
+                    <div class="game-info">
+                        <div class="game-title">Nexus Painter</div>
+                        <div class="game-description">Paint beautiful pixel art masterpieces!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ Unlimited</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Nova Strike -->
+            <a href="games/nova-strike.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💥</div>
+                    <div class="game-info">
+                        <div class="game-title">Nova Strike</div>
+                        <div class="game-description">Strike with the power of nova explosions!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Ocean Explorer -->
+            <a href="games/ocean-explorer.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌊</div>
+                    <div class="game-info">
+                        <div class="game-title">Ocean Explorer</div>
+                        <div class="game-description">Explore the deep ocean and discover creatures!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Orbit Defender -->
+            <a href="games/orbit-defender.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🛸</div>
+                    <div class="game-info">
+                        <div class="game-title">Orbit Defender</div>
+                        <div class="game-description">Defend your planet from orbital threats!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Pac-Man -->
+            <a href="games/pacman.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">👻</div>
+                    <div class="game-info">
+                        <div class="game-title">Pac-Man</div>
+                        <div class="game-description">Eat dots while avoiding ghosts. Grab power-ups to fight back!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Phantom Path -->
+            <a href="games/phantom-path.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">👤</div>
+                    <div class="game-info">
+                        <div class="game-title">Phantom Path</div>
+                        <div class="game-description">Navigate phantom-filled paths safely!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Ping Pong 2P -->
+            <a href="games/ping-pong-2p.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🏸</div>
+                    <div class="game-info">
+                        <div class="game-title">Ping Pong</div>
+                        <div class="game-description">2-player paddle action. Same keyboard, local multiplayer!</div>
+                        <div class="game-stats">
+                            <span>👥 Local 2P</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Pixel Blast -->
+            <a href="games/pixel-blast.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💥</div>
+                    <div class="game-info">
+                        <div class="game-title">Pixel Blast</div>
+                        <div class="game-description">Blast pixels across the screen!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Pixel Painter -->
+            <a href="games/pixel-painter.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎨</div>
+                    <div class="game-info">
+                        <div class="game-title">Pixel Painter</div>
+                        <div class="game-description">Create pixel art on a 40x40 grid. Creative freedom!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ Unlimited</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Pixel Perfect -->
+            <a href="games/pixel-perfect.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">✨</div>
+                    <div class="game-info">
+                        <div class="game-title">Pixel Perfect</div>
+                        <div class="game-description">Create pixel-perfect designs and patterns!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Plasma Collector -->
+            <a href="games/plasma-collector.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚡</div>
+                    <div class="game-info">
+                        <div class="game-title">Plasma Collector</div>
+                        <div class="game-description">Collect plasma orbs across dimensions!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Pong -->
+            <a href="games/pong.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🏓</div>
+                    <div class="game-info">
+                        <div class="game-title">Pong</div>
+                        <div class="game-description">Classic paddle game. Beat the AI or play with a friend!</div>
+                        <div class="game-stats">
+                            <span>👥 1v1</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Prism Match -->
+            <a href="games/prism-match.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌈</div>
+                    <div class="game-info">
+                        <div class="game-title">Prism Match</div>
+                        <div class="game-description">Match prismatic colors and light patterns!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Pulse Beat -->
+            <a href="games/pulse-beat.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">💓</div>
+                    <div class="game-info">
+                        <div class="game-title">Pulse Beat</div>
+                        <div class="game-description">Follow the pulse of the beat and keep rhythm!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Pulse Runner -->
+            <a href="games/pulse-runner.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🏃</div>
+                    <div class="game-info">
+                        <div class="game-title">Pulse Runner</div>
+                        <div class="game-description">Run to the beat of your heart!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Puzzle Match -->
+            <a href="games/puzzle-match.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎯</div>
+                    <div class="game-info">
+                        <div class="game-title">Puzzle Match</div>
+                        <div class="game-description">Match 3+ tiles in rows. Clear the board to win!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Quake Runner -->
+            <a href="games/quake-runner.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌍</div>
+                    <div class="game-info">
+                        <div class="game-title">Quake Runner</div>
+                        <div class="game-description">Avoid the cracks in the earth! Earthquake platformer!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Quantum Sync -->
+            <a href="games/quantum-sync.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚛️</div>
+                    <div class="game-info">
+                        <div class="game-title">Quantum Sync</div>
+                        <div class="game-description">Sync quantum particles for universe harmony!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Quick Tap -->
+            <a href="games/quick-tap.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚡</div>
+                    <div class="game-info">
+                        <div class="game-title">Quick Tap</div>
+                        <div class="game-description">Tap green circles, avoid red. Fast reflex game!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Resonance Grid -->
+            <a href="games/resonance-grid.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">📡</div>
+                    <div class="game-info">
+                        <div class="game-title">Resonance Grid</div>
+                        <div class="game-description">Build resonance patterns in a mystical grid!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Retro Racer -->
+            <a href="games/retro-racer.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🏎️</div>
+                    <div class="game-info">
+                        <div class="game-title">Retro Racer</div>
+                        <div class="game-description">Race through retro landscapes at high speed!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Rhythm Master -->
+            <a href="games/rhythm-master.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎼</div>
+                    <div class="game-info">
+                        <div class="game-title">Rhythm Master</div>
+                        <div class="game-description">Master rhythmic patterns and beat timing!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Rhythm Tap -->
+            <a href="games/rhythm-tap.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">♪♫</div>
+                    <div class="game-info">
+                        <div class="game-title">Rhythm Tap</div>
+                        <div class="game-description">Tap lanes in rhythm. Build combos and accuracy!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Riddle Realm -->
+            <a href="games/riddle-realm.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🧩</div>
+                    <div class="game-info">
+                        <div class="game-title">Riddle Realm</div>
+                        <div class="game-description">Solve riddles to unlock the realm's secrets!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Rotator -->
+            <a href="games/rotator.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔄</div>
+                    <div class="game-info">
+                        <div class="game-title">Rotator</div>
+                        <div class="game-description">Rotate and match patterns in a spinning world!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Sequence Solver -->
+            <a href="games/sequence-solver.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔢</div>
+                    <div class="game-info">
+                        <div class="game-title">Sequence Solver</div>
+                        <div class="game-description">Solve numerical sequences and patterns!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Shadow Dash -->
+            <a href="games/shadow-dash.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌑</div>
+                    <div class="game-info">
+                        <div class="game-title">Shadow Dash</div>
+                        <div class="game-description">Dash through shadows and darkness!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Simon -->
+            <a href="games/simon.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎨</div>
+                    <div class="game-info">
+                        <div class="game-title">Simon</div>
+                        <div class="game-description">Repeat the growing color sequence. How far can you go?</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 2+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Sky Flyer -->
+            <a href="games/sky-flyer.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">✈️</div>
+                    <div class="game-info">
+                        <div class="game-title">Sky Flyer</div>
+                        <div class="game-description">Fly through the sky and collect items!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Snake -->
+            <a href="games/snake.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🐍</div>
+                    <div class="game-info">
+                        <div class="game-title">Snake</div>
+                        <div class="game-description">Navigate the snake, eat food, avoid hitting walls and yourself.</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 2+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Sokoban -->
+            <a href="games/sokoban.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">📦</div>
+                    <div class="game-info">
+                        <div class="game-title">Sokoban</div>
+                        <div class="game-description">Push boxes onto goal squares. Challenging puzzle action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 10+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Solar Flare -->
+            <a href="games/solar-flare.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">☀️</div>
+                    <div class="game-info">
+                        <div class="game-title">Solar Flare</div>
+                        <div class="game-description">Harness solar energy and create flares!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Space Invaders -->
+            <a href="games/space-invaders.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">👾</div>
+                    <div class="game-info">
+                        <div class="game-title">Space Invaders</div>
+                        <div class="game-description">Shoot incoming alien waves. Don't let them reach the bottom!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Space Maze -->
+            <a href="games/space-maze.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌌</div>
+                    <div class="game-info">
+                        <div class="game-title">Space Maze</div>
+                        <div class="game-description">Navigate procedural mazes. Find all exits before time runs out!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Spectrum Runner -->
+            <a href="games/spectrum-runner.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌈</div>
+                    <div class="game-info">
+                        <div class="game-title">Spectrum Runner</div>
+                        <div class="game-description">Run through rainbow spectrums!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Surge Defender -->
+            <a href="games/surge-defender.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⚡</div>
+                    <div class="game-info">
+                        <div class="game-title">Surge Defender</div>
+                        <div class="game-description">Defend against energy surges!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Synth Wave -->
+            <a href="games/synth-wave.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🎹</div>
+                    <div class="game-info">
+                        <div class="game-title">Synth Wave</div>
+                        <div class="game-description">Create synth waves and melodies!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Tempest Surge -->
+            <a href="games/tempest-surge.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⛈️</div>
+                    <div class="game-info">
+                        <div class="game-title">Tempest Surge</div>
+                        <div class="game-description">Navigate through the storm!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Tetris -->
+            <a href="games/tetris.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🟨🟦🟧🟥</div>
+                    <div class="game-info">
+                        <div class="game-title">Tetris</div>
+                        <div class="game-description">Stack falling blocks and clear lines. Classic puzzle action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Tidal Wave -->
+            <a href="games/tidal-wave.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌊</div>
+                    <div class="game-info">
+                        <div class="game-title">Tidal Wave</div>
+                        <div class="game-description">Ride the tidal wave without falling!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Time Racer -->
+            <a href="games/time-racer.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">⏱️</div>
+                    <div class="game-info">
+                        <div class="game-title">Time Racer</div>
+                        <div class="game-description">Race against time in high-speed action!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Titan Clash -->
+            <a href="games/titan-clash.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🦾</div>
+                    <div class="game-info">
+                        <div class="game-title">Titan Clash</div>
+                        <div class="game-description">Battle titans in epic clashes!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Tornado Vortex -->
+            <a href="games/tornado-vortex.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌪️</div>
+                    <div class="game-info">
+                        <div class="game-title">Tornado Vortex</div>
+                        <div class="game-description">Harness the tornado's power! Spiral mechanics fun!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Tsunami Escape -->
+            <a href="games/tsunami-escape.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌊</div>
+                    <div class="game-info">
+                        <div class="game-title">Tsunami Escape</div>
+                        <div class="game-description">Outrun the tsunami!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Vaporwave Escape -->
+            <a href="games/vaporwave-escape.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔮</div>
+                    <div class="game-info">
+                        <div class="game-title">Vaporwave Escape</div>
+                        <div class="game-description">Escape through vaporwave aesthetic worlds!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Velocity Zero -->
+            <a href="games/velocity-zero.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🚀</div>
+                    <div class="game-info">
+                        <div class="game-title">Velocity Zero</div>
+                        <div class="game-description">Control velocity to reach zero point!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Void Collector -->
+            <a href="games/void-collector.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🕳️</div>
+                    <div class="game-info">
+                        <div class="game-title">Void Collector</div>
+                        <div class="game-description">Collect void orbs from the abyss!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 5+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Void Escape -->
+            <a href="games/void-escape.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌌</div>
+                    <div class="game-info">
+                        <div class="game-title">Void Escape</div>
+                        <div class="game-description">Escape the infinite void!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Void Jumper -->
+            <a href="games/void-jumper.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">✨</div>
+                    <div class="game-info">
+                        <div class="game-title">Void Jumper</div>
+                        <div class="game-description">Jump through void dimensions!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Volcanic Eruption -->
+            <a href="games/volcanic-eruption.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🌋</div>
+                    <div class="game-info">
+                        <div class="game-title">Volcanic Eruption</div>
+                        <div class="game-description">Escape the eruption waves!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Whack A Mole -->
+            <a href="games/whack-a-mole.html" style="text-decoration: none;">
+                <div class="game-card">
+                    <div class="game-preview">🔨</div>
+                    <div class="game-info">
+                        <div class="game-title">Whack A Mole</div>
+                        <div class="game-description">Click moles as they pop up. Fast reflexes required!</div>
+                        <div class="game-stats">
+                            <span>👥 Solo</span>
+                            <span>⏱️ 3+ min</span>
+                        </div>
+                        <button class="play-btn">PLAY</button>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="stats-section">
+            <h2>📊 COLLECTION STATS</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">114+</div>
+                    <div class="stat-label">Classic Games</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">200K+</div>
+                    <div class="stat-label">Lines of Code</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">∞</div>
+                    <div class="stat-label">Hours of Fun</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">🚀</div>
+                    <div class="stat-label">Pure Fun</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

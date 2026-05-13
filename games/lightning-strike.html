@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIGHTNING STRIKE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #2a2a5c, #1a1a3c);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #3a3a6d, #1a1a3d);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #ccc; }
+        button {
+            padding: 8px 16px;
+            background: #5555ff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #7777ff; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ LIGHTNING STRIKE ⚡</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>CLICK to redirect lightning bolts</p>
+                <p>Don't let them hit you!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 175, y: 550, width: 25, height: 25 },
+            lightning: [],
+            reflectors: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            highScore: localStorage.getItem('lightning-strike-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 550, width: 25, height: 25 };
+                this.lightning = [];
+                this.reflectors = [];
+                this.score = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.frameCount++;
+
+                // Spawn lightning
+                if (this.frameCount % 40 === 0) {
+                    const fromLeft = Math.random() > 0.5;
+                    this.lightning.push({
+                        x: fromLeft ? 0 : this.width,
+                        y: Math.random() * (this.height - 100),
+                        vx: fromLeft ? 4 : -4,
+                        vy: (Math.random() - 0.5) * 2,
+                        width: 10,
+                        height: 5,
+                        life: 150 + this.score * 2,
+                        maxLife: 150 + this.score * 2,
+                        reflected: false
+                    });
+                }
+
+                // Update lightning
+                for (let i = this.lightning.length - 1; i >= 0; i--) {
+                    const bolt = this.lightning[i];
+                    bolt.x += bolt.vx;
+                    bolt.y += bolt.vy;
+                    bolt.life--;
+
+                    if (bolt.life <= 0 || bolt.x < -20 || bolt.x > this.width + 20 || bolt.y < -20 || bolt.y > this.height + 20) {
+                        this.lightning.splice(i, 1);
+                        if (!bolt.reflected) {
+                            this.score++;
+                        }
+                    } else {
+                        // Check collision with player
+                        if (this.checkCollision(this.player, bolt)) {
+                            this.endGame();
+                        }
+
+                        // Check collision with reflectors
+                        for (let reflector of this.reflectors) {
+                            if (this.checkCollision(reflector, bolt)) {
+                                bolt.vx *= -1.1;
+                                bolt.vy = (Math.random() - 0.5) * 3;
+                                bolt.reflected = true;
+                                bolt.x += bolt.vx;
+                            }
+                        }
+                    }
+                }
+
+                // Update reflectors
+                for (let i = this.reflectors.length - 1; i >= 0; i--) {
+                    this.reflectors[i].life--;
+                    if (this.reflectors[i].life <= 0) {
+                        this.reflectors.splice(i, 1);
+                    }
+                }
+            },
+
+            checkCollision(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('lightning-strike-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Storm background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#3a3a6d');
+                gradient.addColorStop(1, '#1a1a3d');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw lightning bolts
+                for (let bolt of this.lightning) {
+                    this.ctx.strokeStyle = `rgba(255, 255, 0, ${bolt.life / bolt.maxLife})`;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(bolt.x, bolt.y);
+
+                    // Draw zigzag lightning
+                    let segX = bolt.x;
+                    let segY = bolt.y;
+                    for (let j = 0; j < 5; j++) {
+                        segX += (Math.random() - 0.5) * 20;
+                        segY += 10;
+                        this.ctx.lineTo(segX, segY);
+                    }
+                    this.ctx.stroke();
+
+                    // Glow effect
+                    this.ctx.fillStyle = `rgba(255, 255, 150, ${0.3 * (bolt.life / bolt.maxLife)})`;
+                    this.ctx.fillRect(bolt.x - 8, bolt.y - 8, bolt.width + 16, bolt.height + 16);
+                }
+
+                // Draw reflectors
+                for (let refl of this.reflectors) {
+                    this.ctx.fillStyle = `rgba(100, 200, 255, ${refl.life / refl.maxLife})`;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(refl.x, refl.y);
+                    this.ctx.lineTo(refl.x + refl.width, refl.y + refl.height / 2);
+                    this.ctx.lineTo(refl.x, refl.y + refl.height);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#00ffff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw player shield
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.player.x - 8, this.player.y - 8, this.player.width + 16, this.player.height + 16);
+                this.ctx.fillStyle = '#00dd00';
+                this.ctx.fillRect(this.player.x + 6, this.player.y + 6, 5, 5);
+
+                // Score and info
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('ELECTROCUTED!', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.canvas.addEventListener('click', (e) => {
+                    if (!this.gamePaused && this.gameRunning) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+                        this.reflectors.push({
+                            x: x,
+                            y: y,
+                            width: 20,
+                            height: 30,
+                            life: 60,
+                            maxLife: 60
+                        });
+                    }
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'p' || e.key === 'P') this.togglePause();
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

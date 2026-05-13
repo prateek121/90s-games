@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WHACK-A-MOLE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #8B4513, #D2691E);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 32px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 10px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            width: fit-content;
+        }
+        .hole {
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, #654321, #2c1810);
+            border: 3px solid #000;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            transition: all 0.1s;
+        }
+        .hole:hover { transform: scale(0.95); }
+        .hole.active { box-shadow: inset 0 0 20px rgba(255, 255, 0, 0.5); }
+        .mole {
+            width: 80px;
+            height: 80px;
+            background: #8B4513;
+            border-radius: 50% 50% 45% 45%;
+            position: relative;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+        .mole.visible {
+            opacity: 1;
+        }
+        .mole::before {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #000;
+            border-radius: 50%;
+            top: 25px;
+            left: 20px;
+        }
+        .mole::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #000;
+            border-radius: 50%;
+            top: 25px;
+            right: 20px;
+        }
+        .stats {
+            color: white;
+            margin-top: 30px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .stat-item {
+            font-size: 14px;
+            margin: 8px 0;
+        }
+        .stat-label {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .stat-value {
+            color: #fff;
+            font-size: 20px;
+            margin-top: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #fff;
+            color: #8B4513;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); background: #ffd700; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔨 WHACK-A-MOLE 🔨</h1>
+        <div class="game-board" id="gameBoard"></div>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">TIME</div>
+                <div class="stat-value" id="timer">30s</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">HITS</div>
+                <div class="stat-value" id="hits">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">ACCURACY</div>
+                <div class="stat-value" id="accuracy">--</div>
+            </div>
+        </div>
+        <div>
+            <button onclick="game.reset()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            board: document.getElementById('gameBoard'),
+            gameRunning: false,
+            score: 0,
+            hits: 0,
+            misses: 0,
+            timeLeft: 30,
+            moles: [],
+            timerInterval: null,
+            activeMoleId: null,
+            moleShowTime: 800,
+
+            init() {
+                this.createBoard();
+                this.reset();
+            },
+
+            createBoard() {
+                this.board.innerHTML = '';
+                this.moles = [];
+                for (let i = 0; i < 9; i++) {
+                    const hole = document.createElement('div');
+                    hole.className = 'hole';
+                    hole.id = `mole-${i}`;
+                    hole.innerHTML = '<div class="mole"></div>';
+                    hole.onclick = () => this.hitMole(i);
+                    this.board.appendChild(hole);
+                    this.moles.push({ id: i, visible: false });
+                }
+            },
+
+            reset() {
+                this.score = 0;
+                this.hits = 0;
+                this.misses = 0;
+                this.timeLeft = 30;
+                this.gameRunning = false;
+                this.activeMoleId = null;
+                clearInterval(this.timerInterval);
+                this.hideMole();
+                this.updateDisplay();
+                this.startGame();
+            },
+
+            startGame() {
+                this.gameRunning = true;
+                this.timerInterval = setInterval(() => {
+                    this.timeLeft--;
+                    document.getElementById('timer').textContent = this.timeLeft + 's';
+                    if (this.timeLeft <= 0) {
+                        this.endGame();
+                    }
+                }, 1000);
+                this.showRandomMole();
+            },
+
+            showRandomMole() {
+                if (!this.gameRunning) return;
+
+                const randomId = Math.floor(Math.random() * 9);
+                this.showMole(randomId);
+                setTimeout(() => {
+                    if (this.gameRunning && this.activeMoleId === randomId) {
+                        this.misses++;
+                        this.hideMole();
+                        setTimeout(() => this.showRandomMole(), 300);
+                    }
+                }, this.moleShowTime);
+            },
+
+            showMole(id) {
+                this.activeMoleId = id;
+                const hole = document.getElementById(`mole-${id}`);
+                const mole = hole.querySelector('.mole');
+                hole.classList.add('active');
+                mole.classList.add('visible');
+            },
+
+            hideMole() {
+                if (this.activeMoleId !== null) {
+                    const hole = document.getElementById(`mole-${this.activeMoleId}`);
+                    const mole = hole.querySelector('.mole');
+                    hole.classList.remove('active');
+                    mole.classList.remove('visible');
+                }
+                this.activeMoleId = null;
+            },
+
+            hitMole(id) {
+                if (this.gameRunning && this.activeMoleId === id) {
+                    this.score += 10;
+                    this.hits++;
+                    this.hideMole();
+                    setTimeout(() => this.showRandomMole(), 300);
+                } else if (this.gameRunning) {
+                    this.misses++;
+                }
+                this.updateDisplay();
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                clearInterval(this.timerInterval);
+                this.hideMole();
+                const accuracy = Math.round((this.hits / (this.hits + this.misses)) * 100) || 0;
+                alert(`Game Over!\nScore: ${this.score}\nHits: ${this.hits}\nAccuracy: ${accuracy}%`);
+            },
+
+            updateDisplay() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('hits').textContent = this.hits;
+                const accuracy = this.hits + this.misses > 0
+                    ? Math.round((this.hits / (this.hits + this.misses)) * 100) + '%'
+                    : '--';
+                document.getElementById('accuracy').textContent = accuracy;
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

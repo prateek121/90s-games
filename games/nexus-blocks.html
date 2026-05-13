@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS BLOCKS - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #1a0033, #330066);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: #ff6600;
+            text-shadow: 0 0 15px #ff6600;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        canvas#gameCanvas {
+            border: 4px solid #ff6600;
+            background: linear-gradient(to bottom, #1a0033, #330066);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 25px rgba(255, 102, 0, 0.4);
+        }
+        .info {
+            color: #ff6600;
+            margin-top: 20px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff6600;
+            text-shadow: 0 0 15px #ff6600;
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #cc5500;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ff6600;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        button:hover { background: #ff8833; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 NEXUS BLOCKS 📦</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>ARROW KEYS to move | SPACE to rotate | DOWN to drop</p>
+                <p>Fill rows to score points!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            gridWidth: 10,
+            gridHeight: 20,
+            cellSize: 30,
+            grid: [],
+            score: 0,
+            level: 1,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            dropCounter: 0,
+            dropSpeed: 30,
+            keys: {},
+            currentPiece: null,
+            nextPiece: null,
+            colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff6600'],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.grid = [];
+                this.score = 0;
+                this.level = 1;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.dropCounter = 0;
+                this.dropSpeed = 30;
+
+                for (let y = 0; y < this.gridHeight; y++) {
+                    this.grid[y] = [];
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        this.grid[y][x] = 0;
+                    }
+                }
+
+                this.currentPiece = this.createPiece();
+                this.nextPiece = this.createPiece();
+            },
+
+            createPiece() {
+                const shapes = [
+                    { shape: [[1, 1, 1, 1]], type: 0 }, // I
+                    { shape: [[1, 1], [1, 1]], type: 1 }, // O
+                    { shape: [[0, 1, 1], [1, 1, 0]], type: 2 }, // S
+                    { shape: [[1, 1, 0], [0, 1, 1]], type: 3 }, // Z
+                    { shape: [[1, 0, 0], [1, 1, 1]], type: 4 }, // J
+                    { shape: [[0, 0, 1], [1, 1, 1]], type: 5 }, // L
+                    { shape: [[0, 1, 0], [1, 1, 1]], type: 6 } // T
+                ];
+
+                const shape = shapes[Math.floor(Math.random() * shapes.length)];
+                return {
+                    shape: shape.shape,
+                    type: shape.type,
+                    x: Math.floor(this.gridWidth / 2) - 1,
+                    y: 0,
+                    color: this.colors[shape.type]
+                };
+            },
+
+            canMove(piece, dx, dy) {
+                for (let y = 0; y < piece.shape.length; y++) {
+                    for (let x = 0; x < piece.shape[y].length; x++) {
+                        if (piece.shape[y][x]) {
+                            const newX = piece.x + x + dx;
+                            const newY = piece.y + y + dy;
+
+                            if (newX < 0 || newX >= this.gridWidth || newY >= this.gridHeight) {
+                                return false;
+                            }
+
+                            if (newY >= 0 && this.grid[newY][newX]) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            },
+
+            lockPiece() {
+                for (let y = 0; y < this.currentPiece.shape.length; y++) {
+                    for (let x = 0; x < this.currentPiece.shape[y].length; x++) {
+                        if (this.currentPiece.shape[y][x]) {
+                            const gridY = this.currentPiece.y + y;
+                            const gridX = this.currentPiece.x + x;
+
+                            if (gridY >= 0) {
+                                this.grid[gridY][gridX] = this.currentPiece.type + 1;
+                            }
+                        }
+                    }
+                }
+
+                this.clearRows();
+                this.currentPiece = this.nextPiece;
+                this.nextPiece = this.createPiece();
+
+                if (!this.canMove(this.currentPiece, 0, 0)) {
+                    this.endGame();
+                }
+            },
+
+            clearRows() {
+                let rowsCleared = 0;
+
+                for (let y = this.gridHeight - 1; y >= 0; y--) {
+                    let full = true;
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        if (!this.grid[y][x]) {
+                            full = false;
+                            break;
+                        }
+                    }
+
+                    if (full) {
+                        rowsCleared++;
+                        this.grid.splice(y, 1);
+                        this.grid.unshift(new Array(this.gridWidth).fill(0));
+                    }
+                }
+
+                if (rowsCleared > 0) {
+                    this.score += rowsCleared * 100;
+                    this.level = Math.floor(this.score / 500) + 1;
+                    this.dropSpeed = Math.max(5, 30 - this.level * 2);
+                }
+            },
+
+            rotatePiece() {
+                const rotated = this.currentPiece.shape[0].map((_, i) =>
+                    this.currentPiece.shape.map(row => row[i]).reverse()
+                );
+
+                const oldShape = this.currentPiece.shape;
+                this.currentPiece.shape = rotated;
+
+                if (!this.canMove(this.currentPiece, 0, 0)) {
+                    this.currentPiece.shape = oldShape;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Handle input
+                if (this.keys['ArrowLeft'] && this.canMove(this.currentPiece, -1, 0)) {
+                    this.currentPiece.x--;
+                    this.keys['ArrowLeft'] = false;
+                }
+                if (this.keys['ArrowRight'] && this.canMove(this.currentPiece, 1, 0)) {
+                    this.currentPiece.x++;
+                    this.keys['ArrowRight'] = false;
+                }
+
+                // Drop
+                this.dropCounter++;
+                let shouldDrop = this.dropCounter >= this.dropSpeed;
+                if (this.keys['ArrowDown']) {
+                    shouldDrop = true;
+                }
+
+                if (shouldDrop) {
+                    if (this.canMove(this.currentPiece, 0, 1)) {
+                        this.currentPiece.y++;
+                    } else {
+                        this.lockPiece();
+                    }
+                    this.dropCounter = 0;
+                }
+
+                this.frameCount++;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                this.ctx.fillStyle = '#1a0033';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                const startX = (this.width - this.gridWidth * this.cellSize) / 2;
+                const startY = 30;
+
+                // Draw grid
+                this.ctx.strokeStyle = '#330066';
+                this.ctx.lineWidth = 1;
+                for (let y = 0; y <= this.gridHeight; y++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(startX, startY + y * this.cellSize);
+                    this.ctx.lineTo(startX + this.gridWidth * this.cellSize, startY + y * this.cellSize);
+                    this.ctx.stroke();
+                }
+                for (let x = 0; x <= this.gridWidth; x++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(startX + x * this.cellSize, startY);
+                    this.ctx.lineTo(startX + x * this.cellSize, startY + this.gridHeight * this.cellSize);
+                    this.ctx.stroke();
+                }
+
+                // Draw placed blocks
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        if (this.grid[y][x]) {
+                            this.ctx.fillStyle = this.colors[this.grid[y][x] - 1];
+                            this.ctx.fillRect(startX + x * this.cellSize + 1, startY + y * this.cellSize + 1, this.cellSize - 2, this.cellSize - 2);
+                            this.ctx.strokeStyle = '#ffffff';
+                            this.ctx.lineWidth = 1;
+                            this.ctx.strokeRect(startX + x * this.cellSize + 1, startY + y * this.cellSize + 1, this.cellSize - 2, this.cellSize - 2);
+                        }
+                    }
+                }
+
+                // Draw current piece
+                for (let y = 0; y < this.currentPiece.shape.length; y++) {
+                    for (let x = 0; x < this.currentPiece.shape[y].length; x++) {
+                        if (this.currentPiece.shape[y][x]) {
+                            const px = startX + (this.currentPiece.x + x) * this.cellSize;
+                            const py = startY + (this.currentPiece.y + y) * this.cellSize;
+
+                            this.ctx.fillStyle = this.currentPiece.color;
+                            this.ctx.fillRect(px + 1, py + 1, this.cellSize - 2, this.cellSize - 2);
+                            this.ctx.strokeStyle = '#ffffff';
+                            this.ctx.lineWidth = 2;
+                            this.ctx.strokeRect(px + 1, py + 1, this.cellSize - 2, this.cellSize - 2);
+                        }
+                    }
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff6600';
+                this.ctx.font = 'bold 18px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 20);
+                this.ctx.fillText(`Level: ${this.level}`, this.width - 120, 20);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff6600';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 30);
+                    this.ctx.fillStyle = '#ff6600';
+                    this.ctx.font = '18px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 30);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowLeft') {
+                        this.keys['ArrowLeft'] = true;
+                        e.preventDefault();
+                    }
+                    if (e.key === 'ArrowRight') {
+                        this.keys['ArrowRight'] = true;
+                        e.preventDefault();
+                    }
+                    if (e.key === 'ArrowDown') {
+                        this.keys['ArrowDown'] = true;
+                        e.preventDefault();
+                    }
+                    if (e.key === ' ') {
+                        this.rotatePiece();
+                        e.preventDefault();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

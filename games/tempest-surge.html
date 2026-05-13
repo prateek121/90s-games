@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEMPEST SURGE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #3a3a7d, #1a1a4d);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #4a4a9d, #2a2a6d);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(100, 100, 200, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #ccc; }
+        button {
+            padding: 8px 16px;
+            background: #5555cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #7777ee; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⛈️ TEMPEST SURGE ⛈️</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>LEFT/RIGHT ARROW or A/D to navigate</p>
+                <p>Navigate through the storm!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 175, y: 550, width: 25, height: 25, speed: 4 },
+            storms: [],
+            particles: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            highScore: localStorage.getItem('tempest-surge-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 550, width: 25, height: 25, speed: 4 };
+                this.storms = [];
+                this.particles = [];
+                this.score = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Handle input
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    if (this.player.x > 0) this.player.x -= this.player.speed;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    if (this.player.x + this.player.width < this.width) this.player.x += this.player.speed;
+                }
+
+                // Spawn storms
+                this.frameCount++;
+                const spawnRate = Math.max(20, 50 - Math.floor(this.score / 100) * 3);
+                if (this.frameCount % spawnRate === 0) {
+                    const width = 40 + Math.random() * 40;
+                    this.storms.push({
+                        x: Math.random() * (this.width - width),
+                        y: -40,
+                        width: width,
+                        height: 40,
+                        vy: 2 + this.score / 300,
+                        swayDir: Math.random() > 0.5 ? 1 : -1,
+                        sway: 0
+                    });
+                }
+
+                // Update storms
+                for (let i = this.storms.length - 1; i >= 0; i--) {
+                    const storm = this.storms[i];
+                    storm.y += storm.vy;
+                    storm.sway += storm.swayDir * 0.3;
+                    storm.x += Math.sin(storm.sway) * 0.5;
+
+                    if (storm.y > this.height) {
+                        this.storms.splice(i, 1);
+                        this.score++;
+                    } else {
+                        if (this.checkCollision(this.player, storm)) {
+                            this.endGame();
+                        }
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.y += p.vy;
+                    p.x += p.vx;
+                    p.life--;
+                    if (p.life <= 0) this.particles.splice(i, 1);
+                }
+            },
+
+            checkCollision(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('tempest-surge-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#4a4a9d');
+                gradient.addColorStop(1, '#2a2a6d');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw lightning in background
+                this.ctx.strokeStyle = 'rgba(200, 200, 255, 0.3)';
+                this.ctx.lineWidth = 2;
+                for (let i = 0; i < 3; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(Math.random() * this.width, 0);
+                    this.ctx.lineTo(Math.random() * this.width, this.height);
+                    this.ctx.stroke();
+                }
+
+                // Draw storms
+                for (let storm of this.storms) {
+                    this.ctx.fillStyle = '#3366dd';
+                    this.ctx.fillRect(storm.x, storm.y, storm.width, storm.height);
+                    this.ctx.fillStyle = '#5588ff';
+                    for (let j = 0; j < 3; j++) {
+                        this.ctx.fillRect(storm.x + j * 12, storm.y + 10, 8, 20);
+                    }
+                }
+
+                // Draw player (ship)
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.player.x + this.player.width / 2, this.player.y);
+                this.ctx.lineTo(this.player.x + this.player.width, this.player.y + this.player.height);
+                this.ctx.lineTo(this.player.x, this.player.y + this.player.height);
+                this.ctx.fill();
+                this.ctx.fillStyle = '#ffcc00';
+                this.ctx.fillRect(this.player.x + 8, this.player.y + 8, 9, 9);
+
+                // Score
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

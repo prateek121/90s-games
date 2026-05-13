@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUANTUM SYNC - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #001a4d, #003366);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: #00ccff;
+            text-shadow: 0 0 20px #00ccff;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        canvas#gameCanvas {
+            border: 4px solid #00ccff;
+            background: linear-gradient(135deg, #001a4d, #003366);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0, 204, 255, 0.4);
+        }
+        .info {
+            color: #00ccff;
+            margin-top: 20px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ccff;
+            text-shadow: 0 0 15px #00ccff;
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #0099cc;
+        }
+        button {
+            padding: 8px 16px;
+            background: #001a4d;
+            color: #00ccff;
+            border: 2px solid #00ccff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        button:hover { background: #003366; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚛ QUANTUM SYNC ⚛</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>CLICK to flip tiles and match patterns</p>
+                <p>Remember the sequence! Match all pairs!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            gridSize: 4,
+            tileSize: 60,
+            tiles: [],
+            flipped: [],
+            matched: [],
+            score: 0,
+            moves: 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            canClick: true,
+            firstTile: null,
+            symbols: ['⬢', '◆', '▲', '●', '■', '✦', '◆', '▲'],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.tiles = [];
+                this.flipped = [];
+                this.matched = [];
+                this.score = 0;
+                this.moves = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.canClick = true;
+                this.firstTile = null;
+
+                // Create tile pairs
+                const symbols = this.symbols.slice(0, (this.gridSize * this.gridSize) / 2);
+                const pairs = [...symbols, ...symbols];
+
+                // Shuffle
+                for (let i = pairs.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+                }
+
+                // Create tiles
+                for (let i = 0; i < pairs.length; i++) {
+                    this.tiles.push({
+                        id: i,
+                        symbol: pairs[i],
+                        matched: false
+                    });
+                    this.flipped[i] = false;
+                }
+            },
+
+            getTilePosition(index) {
+                const startX = (this.width - this.gridSize * this.tileSize) / 2;
+                const startY = (this.height - this.gridSize * this.tileSize) / 2;
+
+                const x = index % this.gridSize;
+                const y = Math.floor(index / this.gridSize);
+
+                return {
+                    x: startX + x * this.tileSize,
+                    y: startY + y * this.tileSize
+                };
+            },
+
+            getTileFromMouse(mouseX, mouseY) {
+                const startX = (this.width - this.gridSize * this.tileSize) / 2;
+                const startY = (this.height - this.gridSize * this.tileSize) / 2;
+
+                const x = Math.floor((mouseX - startX) / this.tileSize);
+                const y = Math.floor((mouseY - startY) / this.tileSize);
+
+                const index = y * this.gridSize + x;
+
+                if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
+                    return index;
+                }
+                return -1;
+            },
+
+            flipTile(index) {
+                if (!this.canClick || this.flipped[index] || this.matched[index]) return;
+
+                if (!this.firstTile) {
+                    this.firstTile = index;
+                    this.flipped[index] = true;
+                } else {
+                    if (index === this.firstTile) return;
+
+                    this.flipped[index] = true;
+                    this.moves++;
+
+                    if (this.tiles[this.firstTile].symbol === this.tiles[index].symbol) {
+                        this.matched[this.firstTile] = true;
+                        this.matched[index] = true;
+                        this.score += 100;
+                        this.firstTile = null;
+
+                        // Check win
+                        if (this.matched.filter(m => m).length === this.tiles.length) {
+                            this.endGame();
+                        }
+                    } else {
+                        this.canClick = false;
+                        setTimeout(() => {
+                            this.flipped[this.firstTile] = false;
+                            this.flipped[index] = false;
+                            this.firstTile = null;
+                            this.canClick = true;
+                        }, 600);
+                    }
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                this.ctx.fillStyle = '#001a4d';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Animated background particles
+                for (let i = 0; i < 30; i++) {
+                    this.ctx.fillStyle = `rgba(0, 204, 255, ${0.2 * (1 - Math.abs(Math.sin(performance.now() / 2000 + i)))})`;
+                    const x = (i * 40 + performance.now() / 50) % this.width;
+                    const y = (i * 50 + performance.now() / 60) % this.height;
+                    this.ctx.fillRect(x, y, 2, 2);
+                }
+
+                const startX = (this.width - this.gridSize * this.tileSize) / 2;
+                const startY = (this.height - this.gridSize * this.tileSize) / 2;
+
+                // Draw tiles
+                for (let i = 0; i < this.tiles.length; i++) {
+                    const pos = this.getTilePosition(i);
+                    const tile = this.tiles[i];
+
+                    // Tile background
+                    this.ctx.fillStyle = this.flipped[i] || this.matched[i] ? '#003366' : '#001a4d';
+                    this.ctx.fillRect(pos.x + 3, pos.y + 3, this.tileSize - 6, this.tileSize - 6);
+
+                    // Border
+                    this.ctx.strokeStyle = '#00ccff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(pos.x + 3, pos.y + 3, this.tileSize - 6, this.tileSize - 6);
+
+                    // Content
+                    if (this.flipped[i] || this.matched[i]) {
+                        this.ctx.fillStyle = '#00ff00';
+                        this.ctx.font = 'bold 32px monospace';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.fillText(tile.symbol, pos.x + this.tileSize / 2, pos.y + this.tileSize / 2);
+
+                        if (this.matched[i]) {
+                            this.ctx.strokeStyle = '#ffff00';
+                            this.ctx.lineWidth = 3;
+                            this.ctx.strokeRect(pos.x + 3, pos.y + 3, this.tileSize - 6, this.tileSize - 6);
+                        }
+                    } else {
+                        this.ctx.fillStyle = '#0099cc';
+                        this.ctx.font = 'bold 24px monospace';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.fillText('?', pos.x + this.tileSize / 2, pos.y + this.tileSize / 2);
+                    }
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ccff';
+                this.ctx.font = 'bold 18px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 30);
+                this.ctx.fillText(`Moves: ${this.moves}`, 10, 60);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ccff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('YOU WON!', this.width / 2, this.height / 2 - 30);
+                    this.ctx.fillStyle = '#00ccff';
+                    this.ctx.font = '18px monospace';
+                    this.ctx.fillText(`Score: ${this.score} | Moves: ${this.moves}`, this.width / 2, this.height / 2 + 30);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const index = this.getTileFromMouse(x, y);
+                    if (index !== -1) {
+                        this.flipTile(index);
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

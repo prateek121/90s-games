@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEXAGON DEFENSE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #c084fc;
+            background: linear-gradient(to bottom, #1f1f2e, #16213e);
+            display: block;
+            box-shadow: 0 0 20px rgba(192, 132, 252, 0.5);
+        }
+        .info {
+            color: #c084fc;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(192, 132, 252, 0.1);
+            border: 2px solid #c084fc;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #c084fc;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(192, 132, 252, 0.1);
+            border: 2px solid #c084fc;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Health</div>
+                <div class="stat-value" id="health">3</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                CLICK on hexagon<br/>
+                Destroy enemies<br/>
+                Prevent damage!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 500,
+
+            center: { x: 250, y: 250 },
+            hexagon: { radius: 60, health: 100, maxHealth: 100 },
+            enemies: [],
+            projectiles: [],
+
+            score: 0,
+            level: 1,
+            health: 3,
+            gameRunning: false,
+            gameOver: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.spawnWave();
+                }
+            },
+
+            spawnWave() {
+                const enemyCount = 3 + this.level;
+                for (let i = 0; i < enemyCount; i++) {
+                    const angle = (Math.PI * 2 * i) / enemyCount;
+                    const distance = 200;
+                    this.enemies.push({
+                        x: this.center.x + Math.cos(angle) * distance,
+                        y: this.center.y + Math.sin(angle) * distance,
+                        vx: -Math.cos(angle) * (1 + this.level * 0.2),
+                        vy: -Math.sin(angle) * (1 + this.level * 0.2),
+                        radius: 8,
+                        health: 1 + Math.floor(this.level / 2),
+                        color: `hsl(${Math.random() * 360}, 100%, 50%)`
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Update enemies
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const enemy = this.enemies[i];
+                    enemy.x += enemy.vx;
+                    enemy.y += enemy.vy;
+
+                    const distToCenter = Math.hypot(
+                        enemy.x - this.center.x,
+                        enemy.y - this.center.y
+                    );
+
+                    if (distToCenter < this.hexagon.radius + enemy.radius) {
+                        this.enemies.splice(i, 1);
+                        this.health--;
+                        if (this.health <= 0) {
+                            this.gameOver = true;
+                            this.gameRunning = false;
+                        }
+                        continue;
+                    }
+
+                    // Off-screen
+                    if (enemy.x < -50 || enemy.x > this.width + 50 ||
+                        enemy.y < -50 || enemy.y > this.height + 50) {
+                        this.enemies.splice(i, 1);
+                    }
+                }
+
+                // Update projectiles
+                for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                    const proj = this.projectiles[i];
+                    proj.x += proj.vx;
+                    proj.y += proj.vy;
+                    proj.life--;
+
+                    // Check enemy collisions
+                    let hit = false;
+                    for (let j = this.enemies.length - 1; j >= 0; j--) {
+                        const enemy = this.enemies[j];
+                        const dist = Math.hypot(proj.x - enemy.x, proj.y - enemy.y);
+
+                        if (dist < proj.radius + enemy.radius) {
+                            enemy.health--;
+                            if (enemy.health <= 0) {
+                                this.enemies.splice(j, 1);
+                                this.score += 10 * this.level;
+                            }
+                            hit = true;
+                            break;
+                        }
+                    }
+
+                    if (hit || proj.life <= 0) {
+                        this.projectiles.splice(i, 1);
+                    }
+                }
+
+                if (this.enemies.length === 0 && this.gameRunning) {
+                    this.level++;
+                    this.hexagon.health = this.hexagon.maxHealth;
+                    this.spawnWave();
+                }
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#1f1f2e');
+                gradient.addColorStop(1, '#16213e');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw hexagon
+                this.drawHexagon(
+                    this.center.x,
+                    this.center.y,
+                    this.hexagon.radius,
+                    '#c084fc'
+                );
+
+                // Draw hexagon fill based on health
+                const healthRatio = this.hexagon.health / this.hexagon.maxHealth;
+                this.ctx.globalAlpha = healthRatio * 0.3;
+                this.ctx.fillStyle = '#a855f7';
+                this.ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i;
+                    const x = this.center.x + Math.cos(angle) * this.hexagon.radius;
+                    const y = this.center.y + Math.sin(angle) * this.hexagon.radius;
+                    if (i === 0) this.ctx.moveTo(x, y);
+                    else this.ctx.lineTo(x, y);
+                }
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.globalAlpha = 1;
+
+                // Draw enemies
+                for (let enemy of this.enemies) {
+                    this.ctx.fillStyle = enemy.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                }
+
+                // Draw projectiles
+                for (let proj of this.projectiles) {
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.beginPath();
+                    this.ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#c084fc';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+                this.ctx.fillText(`Level: ${this.level}`, 10, 45);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#c084fc';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Score: ${this.score}`, this.width / 2, this.height / 2 + 40);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('health').textContent = Math.max(0, this.health);
+            },
+
+            drawHexagon(x, y, radius, color) {
+                this.ctx.strokeStyle = color;
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i;
+                    const hx = x + Math.cos(angle) * radius;
+                    const hy = y + Math.sin(angle) * radius;
+
+                    if (i === 0) this.ctx.moveTo(hx, hy);
+                    else this.ctx.lineTo(hx, hy);
+                }
+
+                this.ctx.closePath();
+                this.ctx.stroke();
+            },
+
+            setupInput() {
+                document.addEventListener('click', (e) => {
+                    if (!this.gameRunning) {
+                        this.start();
+                        return;
+                    }
+
+                    const rect = this.canvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+
+                    const angle = Math.atan2(clickY - this.center.y, clickX - this.center.x);
+                    this.projectiles.push({
+                        x: this.center.x + Math.cos(angle) * this.hexagon.radius,
+                        y: this.center.y + Math.sin(angle) * this.hexagon.radius,
+                        vx: Math.cos(angle) * 8,
+                        vy: Math.sin(angle) * 8,
+                        radius: 4,
+                        life: 60
+                    });
+                });
+            },
+
+            restart() {
+                this.enemies = [];
+                this.projectiles = [];
+                this.score = 0;
+                this.level = 1;
+                this.health = 3;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

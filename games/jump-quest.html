@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JUMP QUEST - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #87ceeb, #e0f6ff);
+            display: block;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .info {
+            color: white;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #fff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #fff;
+            color: #667eea;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #fff;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Lives</div>
+                <div class="stat-value" id="lives">3</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Height</div>
+                <div class="stat-value" id="height">0m</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                ← → Move left/right<br/>
+                SPACE Jump<br/>
+                Don't fall!
+            </div>
+            <button onclick="game.start()">START GAME</button>
+            <button onclick="game.restart()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 600,
+            height: 400,
+
+            player: { x: 290, y: 350, width: 20, height: 20, vx: 0, vy: 0, jumping: false },
+            platforms: [],
+            enemies: [],
+            particles: [],
+
+            score: 0,
+            level: 1,
+            lives: 3,
+            gameRunning: false,
+            gameOver: false,
+            highestPoint: 0,
+            platformCount: 8,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.generatePlatforms();
+                this.gameLoop();
+            },
+
+            generatePlatforms() {
+                this.platforms = [];
+                this.enemies = [];
+                for (let i = 0; i < this.platformCount; i++) {
+                    this.platforms.push({
+                        x: Math.random() * (this.width - 60),
+                        y: 350 - i * (this.height / this.platformCount),
+                        width: 60,
+                        height: 12,
+                        type: Math.random() > 0.8 ? 'moving' : 'static',
+                        direction: Math.random() > 0.5 ? 1 : -1
+                    });
+                }
+                // Add enemies
+                for (let i = 0; i < 2; i++) {
+                    this.enemies.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * (this.height * 0.5),
+                        width: 30,
+                        height: 30,
+                        vx: (Math.random() - 0.5) * 3
+                    });
+                }
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Player physics
+                this.player.vy += 0.6; // gravity
+                this.player.x += this.player.vx;
+                this.player.y += this.player.vy;
+                this.player.vx *= 0.9; // friction
+
+                // Wrap around sides
+                if (this.player.x < 0) this.player.x = this.width;
+                if (this.player.x > this.width) this.player.x = 0;
+
+                // Platform collision
+                for (let platform of this.platforms) {
+                    if (this.player.vy > 0 &&
+                        this.player.y + this.player.height > platform.y &&
+                        this.player.y + this.player.height < platform.y + platform.height + 10 &&
+                        this.player.x + this.player.width > platform.x &&
+                        this.player.x < platform.x + platform.width) {
+                        this.player.vy = -15;
+                        this.score += 10;
+                    }
+
+                    // Moving platform
+                    if (platform.type === 'moving') {
+                        platform.x += platform.direction * 2;
+                        if (platform.x < 0 || platform.x + platform.width > this.width) {
+                            platform.direction = -platform.direction;
+                        }
+                    }
+                }
+
+                // Enemy collision
+                for (let enemy of this.enemies) {
+                    enemy.x += enemy.vx;
+                    if (enemy.x < 0 || enemy.x > this.width) enemy.vx = -enemy.vx;
+
+                    if (this.player.x + this.player.width > enemy.x &&
+                        this.player.x < enemy.x + enemy.width &&
+                        this.player.y + this.player.height > enemy.y &&
+                        this.player.y < enemy.y + enemy.height) {
+                        this.lives--;
+                        if (this.lives <= 0) {
+                            this.gameOver = true;
+                            this.gameRunning = false;
+                        }
+                        this.player.x = 290;
+                        this.player.y = 350;
+                        this.player.vy = 0;
+                    }
+                }
+
+                // Fell off screen
+                if (this.player.y > this.height) {
+                    this.lives--;
+                    if (this.lives <= 0) {
+                        this.gameOver = true;
+                        this.gameRunning = false;
+                    }
+                    this.player.x = 290;
+                    this.player.y = 350;
+                    this.player.vy = 0;
+                }
+
+                // Track highest point
+                if (350 - this.player.y > this.highestPoint) {
+                    this.highestPoint = 350 - this.player.y;
+                    if (this.highestPoint > this.level * 1000) {
+                        this.level++;
+                        this.platformCount++;
+                        this.generatePlatforms();
+                    }
+                }
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#87ceeb');
+                gradient.addColorStop(1, '#e0f6ff');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Platforms
+                this.ctx.fillStyle = '#8B4513';
+                for (let platform of this.platforms) {
+                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    if (platform.type === 'moving') {
+                        this.ctx.fillStyle = '#A0522D';
+                        this.ctx.fillRect(platform.x + 5, platform.y - 3, platform.width - 10, 3);
+                        this.ctx.fillStyle = '#8B4513';
+                    }
+                }
+
+                // Enemies
+                this.ctx.fillStyle = '#ff0000';
+                for (let enemy of this.enemies) {
+                    this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                }
+
+                // Player
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+
+                // HUD
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = '14px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 20);
+                this.ctx.fillText(`Lives: ${this.lives}`, 200, 20);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                    this.ctx.font = '14px Arial';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 40);
+                    this.ctx.textAlign = 'left';
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('lives').textContent = this.lives;
+                document.getElementById('height').textContent = (Math.floor(this.highestPoint) / 100).toFixed(0) + 'm';
+            },
+
+            setupInput() {
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key.toLowerCase()] = true;
+                    if (e.key === ' ') {
+                        if (!this.gameRunning && !this.gameOver) this.start();
+                        e.preventDefault();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key.toLowerCase()] = false;
+                });
+
+                setInterval(() => {
+                    if (keys['arrowleft']) this.player.vx = -5;
+                    if (keys['arrowright']) this.player.vx = 5;
+                }, 20);
+            },
+
+            restart() {
+                this.player = { x: 290, y: 350, width: 20, height: 20, vx: 0, vy: 0, jumping: false };
+                this.score = 0;
+                this.level = 1;
+                this.lives = 3;
+                this.highestPoint = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.platformCount = 8;
+                this.generatePlatforms();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

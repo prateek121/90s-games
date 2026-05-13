@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURORA DANCE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a3a4d, #0d1f2d);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #0d1f2d, #1a3a4d);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0, 255, 200, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00ffcc;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #ccc; }
+        button {
+            padding: 8px 16px;
+            background: #00aa99;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #00ddcc; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌌 AURORA DANCE 🌌</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>CLICK to match aurora colors</p>
+                <p>Match the falling colors with your shield!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 175, y: 550, width: 40, height: 30, color: '#00ffcc' },
+            particles: [],
+            colors: ['#ff0099', '#00ffff', '#00ff99', '#ffff00', '#ff6600'],
+            colorParticles: [],
+            score: 0,
+            combo: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            highScore: localStorage.getItem('aurora-dance-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 550, width: 40, height: 30, color: this.colors[0] };
+                this.particles = [];
+                this.colorParticles = [];
+                this.score = 0;
+                this.combo = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.frameCount++;
+
+                // Spawn color particles
+                if (this.frameCount % 35 === 0) {
+                    const colorIndex = Math.floor(Math.random() * this.colors.length);
+                    this.colorParticles.push({
+                        x: Math.random() * (this.width - 30),
+                        y: -30,
+                        size: 20,
+                        vy: 2 + this.score / 300,
+                        color: this.colors[colorIndex],
+                        colorIndex: colorIndex,
+                        matched: false
+                    });
+                }
+
+                // Update color particles
+                for (let i = this.colorParticles.length - 1; i >= 0; i--) {
+                    const cp = this.colorParticles[i];
+                    cp.y += cp.vy;
+
+                    if (cp.y > this.height) {
+                        this.colorParticles.splice(i, 1);
+                        this.combo = 0;
+                    } else {
+                        // Check if in player range
+                        const dx = (cp.x + cp.size / 2) - (this.player.x + this.player.width / 2);
+                        const dy = (cp.y + cp.size / 2) - (this.player.y + this.player.height / 2);
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < 40 && !cp.matched) {
+                            if (cp.colorIndex === this.colors.indexOf(this.player.color)) {
+                                // Match!
+                                this.score += 10 * (1 + this.combo);
+                                this.combo++;
+                                cp.matched = true;
+                                this.createSparkles(cp.x + cp.size / 2, cp.y + cp.size / 2, cp.color);
+                                this.colorParticles.splice(i, 1);
+                            } else {
+                                // Miss
+                                this.endGame();
+                            }
+                        }
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.y -= p.vy;
+                    p.vy -= 0.15;
+                    p.life--;
+                    if (p.life <= 0) this.particles.splice(i, 1);
+                }
+            },
+
+            createSparkles(x, y, color) {
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vy: Math.sin(angle) * 3,
+                        vx: Math.cos(angle) * 3,
+                        life: 30,
+                        color: color
+                    });
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('aurora-dance-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            changeColor(colorIndex) {
+                if (colorIndex < this.colors.length) {
+                    this.player.color = this.colors[colorIndex];
+                }
+            },
+
+            draw() {
+                // Aurora background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0d1f2d');
+                gradient.addColorStop(0.3, '#1a3a4d');
+                gradient.addColorStop(0.5, '#0d4d4d');
+                gradient.addColorStop(1, '#1a3a4d');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw aurora waves in background
+                this.ctx.strokeStyle = 'rgba(0, 255, 150, 0.2)';
+                this.ctx.lineWidth = 2;
+                for (let wave = 0; wave < 3; wave++) {
+                    this.ctx.beginPath();
+                    for (let x = 0; x <= this.width; x += 10) {
+                        const y = 100 + wave * 80 + Math.sin((x / 30) + this.frameCount * 0.02) * 20;
+                        if (x === 0) {
+                            this.ctx.moveTo(x, y);
+                        } else {
+                            this.ctx.lineTo(x, y);
+                        }
+                    }
+                    this.ctx.stroke();
+                }
+
+                // Draw color particles
+                for (let cp of this.colorParticles) {
+                    this.ctx.fillStyle = cp.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(cp.x + cp.size / 2, cp.y + cp.size / 2, cp.size / 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw sparkles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 30;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Draw player shield
+                this.ctx.fillStyle = this.player.color;
+                this.ctx.beginPath();
+                this.ctx.arc(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2, 25, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+
+                // Draw inner circle
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                this.ctx.beginPath();
+                this.ctx.arc(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2, 15, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Score and info
+                this.ctx.fillStyle = '#00ffcc';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.fillText('Combo: ' + this.combo, 10, 80);
+
+                // Instructions
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = '12px Arial';
+                this.ctx.textAlign = 'right';
+                for (let i = 0; i < this.colors.length; i++) {
+                    this.ctx.fillStyle = this.colors[i];
+                    this.ctx.fillText(i + 1, this.width - 10, 30 + i * 20);
+                }
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffcc';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('AURORA FADED', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    const key = parseInt(e.key);
+                    if (!isNaN(key) && key >= 1 && key <= this.colors.length) {
+                        this.changeColor(key - 1);
+                    }
+                    if (e.key === 'p' || e.key === 'P') this.togglePause();
+                });
+
+                this.canvas.addEventListener('click', (e) => {
+                    if (this.gameRunning && !this.gamePaused) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const colorDist = x / (this.width / this.colors.length);
+                        const colorIndex = Math.floor(colorDist);
+                        if (colorIndex >= 0 && colorIndex < this.colors.length) {
+                            this.changeColor(colorIndex);
+                        }
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

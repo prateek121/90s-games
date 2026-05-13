@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APEX PREDATOR - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #0d3a1a, #051a0a);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ff00;
+            background: #051a0a;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+        .info {
+            color: #00ff00;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ff00;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ff00;
+            color: #051a0a;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 10px rgba(0, 255, 0, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #00ff00;">🦁 APEX PREDATOR 🦁</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Size: <span id="size">1</span> | Prey: <span id="prey">0</span> | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">Arrow Keys to move • Eat prey smaller than you</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            predator: { x: 200, y: 300, radius: 10, vx: 0, vy: 0, speed: 3, size: 1, health: 100, hunger: 100 },
+            prey: [],
+            particles: [],
+            powerups: [],
+            score: 0,
+            preyEaten: 0,
+            level: 1,
+            timeLeft: 600,
+            highScore: localStorage.getItem('apexPredatorHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            keys: {},
+            predators: [],
+            combMultiplier: 1,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.predator = { x: 200, y: 300, radius: 10, vx: 0, vy: 0, speed: 3, size: 1, health: 100, hunger: 100 };
+                this.prey = this.spawnPrey();
+                this.predators = this.spawnPredators();
+                this.particles = [];
+                this.powerups = [];
+                this.score = 0;
+                this.preyEaten = 0;
+                this.level = 1;
+                this.timeLeft = 600;
+                this.combMultiplier = 1;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+            },
+
+            spawnPrey() {
+                const prey = [];
+                for (let i = 0; i < 20; i++) {
+                    prey.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * this.height,
+                        radius: 3 + Math.random() * 3,
+                        vx: Math.random() * 1 - 0.5,
+                        vy: Math.random() * 1 - 0.5,
+                        speed: 1,
+                        color: `hsl(${Math.random() * 60 + 100}, 100%, 50%)`
+                    });
+                }
+                return prey;
+            },
+
+            spawnPredators() {
+                const predators = [];
+                for (let i = 0; i < 2; i++) {
+                    predators.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * this.height,
+                        radius: 8,
+                        vx: 0,
+                        vy: 0,
+                        speed: 2,
+                        size: 1,
+                        timer: 0
+                    });
+                }
+                return predators;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Time and difficulty management
+                this.timeLeft--;
+                if (this.timeLeft <= 0) {
+                    this.endGame();
+                    return;
+                }
+
+                this.predator.hunger = Math.max(0, this.predator.hunger - 0.5);
+                if (this.predator.hunger <= 0) {
+                    this.endGame();
+                    return;
+                }
+
+                // Level management
+                if (this.preyEaten > 0 && this.preyEaten % 10 === 0) {
+                    this.level++;
+                    this.combMultiplier = 1 + this.level * 0.1;
+                }
+
+                // Predator movement
+                if (this.keys['ArrowLeft']) this.predator.vx = -this.predator.speed;
+                else if (this.keys['ArrowRight']) this.predator.vx = this.predator.speed;
+                else this.predator.vx *= 0.9;
+
+                if (this.keys['ArrowUp']) this.predator.vy = -this.predator.speed;
+                else if (this.keys['ArrowDown']) this.predator.vy = this.predator.speed;
+                else this.predator.vy *= 0.9;
+
+                this.predator.x += this.predator.vx;
+                this.predator.y += this.predator.vy;
+
+                // Predator boundary
+                this.predator.x = Math.max(this.predator.radius, Math.min(this.width - this.predator.radius, this.predator.x));
+                this.predator.y = Math.max(this.predator.radius, Math.min(this.height - this.predator.radius, this.predator.y));
+
+                // Update prey
+                for (let i = this.prey.length - 1; i >= 0; i--) {
+                    const p = this.prey[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    // Prey boundary
+                    if (p.x < p.radius || p.x > this.width - p.radius) p.vx *= -1;
+                    if (p.y < p.radius || p.y > this.height - p.radius) p.vy *= -1;
+
+                    // Predator collision
+                    const dist = Math.hypot(this.predator.x - p.x, this.predator.y - p.y);
+                    if (dist < this.predator.radius + p.radius) {
+                        if (this.predator.size > p.radius / 5) {
+                            this.createParticles(p.x, p.y, p.color);
+                            this.prey.splice(i, 1);
+                            this.predator.size += 0.1;
+                            this.predator.radius = 10 + this.predator.size * 2;
+                            this.predator.hunger = Math.min(100, this.predator.hunger + 20);
+                            this.score += Math.floor(p.radius * 10 * this.combMultiplier);
+                            this.preyEaten++;
+                        }
+                    }
+                }
+
+                // Spawn more prey
+                if (this.prey.length < 20 + Math.floor(this.preyEaten / 10)) {
+                    this.prey.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * this.height,
+                        radius: 3 + Math.random() * 3,
+                        vx: Math.random() * 1 - 0.5,
+                        vy: Math.random() * 1 - 0.5,
+                        speed: 1,
+                        color: `hsl(${Math.random() * 60 + 100}, 100%, 50%)`
+                    });
+                }
+
+                // Enemy predators AI
+                for (let enemy of this.predators) {
+                    enemy.timer++;
+                    if (enemy.timer % 30 === 0) {
+                        const angle = Math.random() * Math.PI * 2;
+                        enemy.vx = Math.cos(angle) * enemy.speed;
+                        enemy.vy = Math.sin(angle) * enemy.speed;
+                    }
+
+                    enemy.x += enemy.vx;
+                    enemy.y += enemy.vy;
+
+                    // Enemy boundary
+                    if (enemy.x < enemy.radius || enemy.x > this.width - enemy.radius) enemy.vx *= -1;
+                    if (enemy.y < enemy.radius || enemy.y > this.height - enemy.radius) enemy.vy *= -1;
+
+                    // Enemy vs player collision
+                    const dist = Math.hypot(this.predator.x - enemy.x, this.predator.y - enemy.y);
+                    if (dist < this.predator.radius + enemy.radius) {
+                        if (enemy.size > this.predator.size) {
+                            this.endGame();
+                            return;
+                        } else if (this.predator.size > enemy.size) {
+                            this.createParticles(enemy.x, enemy.y, '#ff0000');
+                            this.predators.splice(this.predators.indexOf(enemy), 1);
+                            this.predator.size += 0.3;
+                            this.predator.radius = 10 + this.predator.size * 2;
+                            this.score += 500;
+                        }
+                    }
+                }
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('size').textContent = this.predator.size.toFixed(1);
+                document.getElementById('prey').textContent = this.preyEaten;
+                this.frameCount++;
+            },
+
+            createParticles(x, y, color) {
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        life: 15,
+                        color
+                    });
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                const finalScore = this.score + this.level * 100;
+                if (finalScore > this.highScore) {
+                    this.highScore = finalScore;
+                    localStorage.setItem('apexPredatorHigh', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Jungle background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0d3a1a');
+                gradient.addColorStop(1, '#051a0a');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Foliage
+                this.ctx.fillStyle = 'rgba(0, 100, 0, 0.1)';
+                for (let i = 0; i < 5; i++) {
+                    const x = (this.frameCount * 0.1 + i * 80) % this.width;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, 150, 60, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Prey
+                for (let p of this.prey) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Enemy predators
+                this.ctx.fillStyle = '#ff0000';
+                for (let enemy of this.predators) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#cc0000';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 15;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Main predator
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.beginPath();
+                this.ctx.arc(this.predator.x, this.predator.y, this.predator.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+                // Eyes
+                this.ctx.fillStyle = '#000';
+                this.ctx.beginPath();
+                this.ctx.arc(this.predator.x - 4, this.predator.y - 2, 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.beginPath();
+                this.ctx.arc(this.predator.x + 4, this.predator.y - 2, 2, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // HUD
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Size: ${this.predator.size.toFixed(1)}`, 10, 30);
+                this.ctx.fillText(`Level: ${this.level}`, 10, 50);
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(`Time: ${Math.ceil(this.timeLeft / 60)}s`, this.width - 10, 30);
+                const hungerPercent = Math.ceil((this.predator.hunger / 100) * 10);
+                this.ctx.fillText(`Hunger: ${'█'.repeat(hungerPercent)}`, this.width - 10, 50);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('HUNTED!', this.width / 2, this.height / 2 - 40);
+                    this.ctx.font = '14px Arial';
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 0);
+                    this.ctx.fillText(`Prey Eaten: ${this.preyEaten}`, this.width / 2, this.height / 2 + 22);
+                    this.ctx.fillText(`Level: ${this.level}`, this.width / 2, this.height / 2 + 44);
+                }
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        this.togglePause();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

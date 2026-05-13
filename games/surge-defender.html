@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SURGE DEFENDER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #2d1f4e 0%, #1a0f2e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ffaa;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(0, 255, 170, 0.6);
+        }
+        .info {
+            color: #00ffaa;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(0, 255, 170, 0.1);
+            border: 2px solid #00ffaa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #00ffaa;
+            color: #000;
+            border: 2px solid #00ffaa;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 255, 170, 0.8); }
+        .controls {
+            background: rgba(0, 255, 170, 0.1);
+            border: 2px solid #00ffaa;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="480" height="480"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Wave</div>
+                <div class="stat-value" id="wave">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                MOUSE Move turret<br/>
+                SPACE Charge attack<br/>
+                Defend your base!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 480,
+            height: 480,
+            centerX: 240,
+            centerY: 240,
+
+            base: { x: 240, y: 240, radius: 30, hp: 100, maxHp: 100 },
+            turret: { angle: 0, chargeLevel: 0, maxCharge: 60 },
+            enemies: [],
+            projectiles: [],
+            particles: [],
+            score: 0,
+            wave: 1,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('surgeDefenderBest') || 0,
+            mouseX: 240,
+            mouseY: 240,
+            spacePressed: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = e.clientX - rect.left;
+                    this.mouseY = e.clientY - rect.top;
+                    const dx = this.mouseX - this.centerX;
+                    const dy = this.mouseY - this.centerY;
+                    this.turret.angle = Math.atan2(dy, dx);
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ' && !this.spacePressed) {
+                        this.spacePressed = true;
+                    }
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    if (e.key === ' ') {
+                        this.spacePressed = false;
+                        if (this.turret.chargeLevel > 0) {
+                            this.shoot();
+                            this.turret.chargeLevel = 0;
+                        }
+                    }
+                });
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.spawnWave();
+                }
+            },
+
+            spawnWave() {
+                this.enemies = [];
+                const count = 3 + this.wave;
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 / count) * i;
+                    const speed = 1 + this.wave * 0.2;
+                    this.enemies.push({
+                        x: this.centerX + Math.cos(angle) * 150,
+                        y: this.centerY + Math.sin(angle) * 150,
+                        vx: -Math.cos(angle) * speed,
+                        vy: -Math.sin(angle) * speed,
+                        radius: 15,
+                        hp: 1 + Math.floor(this.wave / 2),
+                        maxHp: 1 + Math.floor(this.wave / 2),
+                        color: `hsl(${Math.random() * 60 + 120}, 100%, 50%)`
+                    });
+                }
+            },
+
+            shoot() {
+                const power = this.turret.chargeLevel / this.turret.maxCharge;
+                const projectileSpeed = 6 + power * 6;
+                this.projectiles.push({
+                    x: this.centerX + Math.cos(this.turret.angle) * 40,
+                    y: this.centerY + Math.sin(this.turret.angle) * 40,
+                    vx: Math.cos(this.turret.angle) * projectileSpeed,
+                    vy: Math.sin(this.turret.angle) * projectileSpeed,
+                    radius: 5 + power * 5,
+                    damage: 1 + power,
+                    color: '#00ffaa'
+                });
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Charge turret
+                if (this.spacePressed && this.turret.chargeLevel < this.turret.maxCharge) {
+                    this.turret.chargeLevel++;
+                }
+
+                // Update projectiles
+                this.projectiles = this.projectiles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    // Check collision with enemies
+                    for (let i = this.enemies.length - 1; i >= 0; i--) {
+                        const e = this.enemies[i];
+                        const dx = p.x - e.x;
+                        const dy = p.y - e.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < p.radius + e.radius) {
+                            e.hp -= p.damage;
+                            this.particles.push({ x: e.x, y: e.y, life: 10, size: 15 });
+                            if (e.hp <= 0) {
+                                this.enemies.splice(i, 1);
+                                this.score += 50 * this.wave;
+                            }
+                            return false;
+                        }
+                    }
+                    return p.x > 0 && p.x < this.width && p.y > 0 && p.y < this.height;
+                });
+
+                // Update enemies
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const e = this.enemies[i];
+                    e.x += e.vx;
+                    e.y += e.vy;
+
+                    // Check collision with base
+                    const dx = e.x - this.centerX;
+                    const dy = e.y - this.centerY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < e.radius + this.base.radius) {
+                        this.base.hp -= 10;
+                        this.enemies.splice(i, 1);
+                        if (this.base.hp <= 0) {
+                            this.gameOver = true;
+                        }
+                    }
+                }
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                // Wave progression
+                if (this.enemies.length === 0 && this.projectiles.length === 0) {
+                    this.wave++;
+                    this.spawnWave();
+                }
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('surgeDefenderBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw base
+                this.ctx.fillStyle = '#00ffaa';
+                this.ctx.beginPath();
+                this.ctx.arc(this.base.x, this.base.y, this.base.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // Draw turret
+                this.ctx.strokeStyle = '#00ffaa';
+                this.ctx.lineWidth = 4;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.centerX, this.centerY);
+                const turretLength = 40 + this.turret.chargeLevel * 0.5;
+                this.ctx.lineTo(
+                    this.centerX + Math.cos(this.turret.angle) * turretLength,
+                    this.centerY + Math.sin(this.turret.angle) * turretLength
+                );
+                this.ctx.stroke();
+
+                // Draw charge indicator
+                if (this.turret.chargeLevel > 0) {
+                    this.ctx.fillStyle = `rgba(0, 255, 170, ${this.turret.chargeLevel / this.turret.maxCharge})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.centerX, this.centerY, 50, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Draw projectiles
+                for (let p of this.projectiles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Draw enemies
+                for (let e of this.enemies) {
+                    this.ctx.fillStyle = e.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Health bar
+                    this.ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    this.ctx.fillRect(e.x - 15, e.y - 25, 30, 3);
+                    this.ctx.fillStyle = '#00ffaa';
+                    this.ctx.fillRect(e.x - 15, e.y - 25, (e.hp / e.maxHp) * 30, 3);
+                }
+
+                // Draw particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = `rgba(0, 255, 170, ${p.life / 10})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size * (1 - p.life / 10), 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ffaa';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`WAVE: ${this.wave}`, 10, 20);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 40);
+                this.ctx.fillText(`HEALTH: ${this.base.hp}`, 10, 60);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffaa';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('BASE DESTROYED', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('wave').textContent = this.wave;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.base = { x: 240, y: 240, radius: 30, hp: 100, maxHp: 100 };
+                this.turret = { angle: 0, chargeLevel: 0, maxCharge: 60 };
+                this.enemies = [];
+                this.projectiles = [];
+                this.particles = [];
+                this.score = 0;
+                this.wave = 1;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.spacePressed = false;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESONANCE GRID - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #0a0a2e, #16213e);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ffcc;
+            background: #0a0a2e;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+        }
+        .info {
+            color: #00ffcc;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ffcc;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ffcc;
+            color: #0a0a2e;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 10px rgba(0, 255, 204, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #00ffcc;">🎵 RESONANCE GRID 🎵</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Frequency: <span id="freq">0</span> | Multiplier: <span id="mult">1x</span> | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">Click grid nodes • Match frequencies for resonance</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            grid: [],
+            gridSize: 4,
+            cellSize: 80,
+            score: 0,
+            frequency: 0,
+            multiplier: 1,
+            targetFrequency: 0,
+            highScore: localStorage.getItem('resonanceGridHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            particles: [],
+            combo: 0,
+            comboResetTimer: 0,
+            timeLeft: 600,
+            level: 1,
+            mistakes: 0,
+            maxMistakes: 5,
+            accuracy: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.grid = this.initializeGrid();
+                this.score = 0;
+                this.frequency = 0;
+                this.multiplier = 1;
+                this.targetFrequency = 440 + Math.random() * 220;
+                this.timeLeft = 600;
+                this.level = 1;
+                this.mistakes = 0;
+                this.maxMistakes = 5;
+                this.accuracy = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.particles = [];
+                this.combo = 0;
+                this.comboResetTimer = 0;
+            },
+
+            initializeGrid() {
+                const grid = [];
+                for (let row = 0; row < this.gridSize; row++) {
+                    grid[row] = [];
+                    for (let col = 0; col < this.gridSize; col++) {
+                        grid[row][col] = {
+                            x: col * this.cellSize + this.cellSize / 2 + 20,
+                            y: row * this.cellSize + this.cellSize / 2 + 100,
+                            value: Math.floor(Math.random() * 8) + 1,
+                            active: false,
+                            pulseValue: 0,
+                            size: 30
+                        };
+                    }
+                }
+                return grid;
+            },
+
+            clickCell(col, row) {
+                if (row < 0 || row >= this.gridSize || col < 0 || col >= this.gridSize) return;
+
+                const cell = this.grid[row][col];
+                cell.active = !cell.active;
+                cell.pulseValue = 10;
+
+                // Calculate frequency contribution
+                if (cell.active) {
+                    this.frequency += cell.value * 50;
+                } else {
+                    this.frequency -= cell.value * 50;
+                }
+
+                this.frequency = Math.max(0, this.frequency);
+
+                // Check resonance
+                const diff = Math.abs(this.frequency - this.targetFrequency);
+                this.accuracy = Math.max(0, 100 - diff / 10);
+
+                if (diff < 30) {
+                    this.combo++;
+                    this.multiplier = 1 + Math.floor(this.combo / 5);
+                    this.level = Math.floor(this.score / 500) + 1;
+                    this.score += Math.floor((2000 - diff) * this.multiplier);
+                    this.targetFrequency = 440 + Math.random() * 220;
+                    this.comboResetTimer = 120;
+
+                    // Create resonance particles
+                    for (let r = 0; r < this.gridSize; r++) {
+                        for (let c = 0; c < this.gridSize; c++) {
+                            if (this.grid[r][c].active) {
+                                this.createResonanceParticles(this.grid[r][c]);
+                            }
+                        }
+                    }
+                } else if (diff > 100 && this.frequency !== 0) {
+                    this.combo = 0;
+                    this.mistakes++;
+                    if (this.mistakes >= this.maxMistakes) {
+                        this.endGame();
+                    }
+                    this.multiplier = 1;
+                    this.comboResetTimer--;
+                } else {
+                    this.comboResetTimer--;
+                    if (this.comboResetTimer <= 0 && this.combo > 0) {
+                        this.combo = 0;
+                        this.multiplier = 1;
+                    }
+                }
+
+                this.createClickParticles(cell.x, cell.y);
+            },
+
+            createClickParticles(x, y) {
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        life: 20,
+                        color: '#00ffcc'
+                    });
+                }
+            },
+
+            createResonanceParticles(cell) {
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    this.particles.push({
+                        x: cell.x,
+                        y: cell.y,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3,
+                        life: 25,
+                        color: `hsl(${180 + Math.random() * 60}, 100%, 50%)`
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.timeLeft--;
+                if (this.timeLeft <= 0) {
+                    this.endGame();
+                    return;
+                }
+
+                // Pulse decay
+                for (let row = 0; row < this.gridSize; row++) {
+                    for (let col = 0; col < this.gridSize; col++) {
+                        if (this.grid[row][col].pulseValue > 0) {
+                            this.grid[row][col].pulseValue--;
+                        }
+                    }
+                }
+
+                // Particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.1;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                if (this.comboResetTimer > 0) {
+                    this.comboResetTimer--;
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('freq').textContent = Math.floor(this.frequency);
+                document.getElementById('mult').textContent = this.multiplier + 'x';
+                this.frameCount++;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('resonanceGridHigh', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0a0a2e');
+                gradient.addColorStop(1, '#16213e');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Frequency wave visualization
+                this.ctx.strokeStyle = 'rgba(0, 255, 204, 0.2)';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                for (let i = 0; i < this.width; i += 10) {
+                    const wave = Math.sin((i + this.frameCount * 0.05) * 0.02) * 20;
+                    const y = 50 + wave;
+                    if (i === 0) this.ctx.moveTo(i, y);
+                    else this.ctx.lineTo(i, y);
+                }
+                this.ctx.stroke();
+
+                // Target frequency display
+                this.ctx.fillStyle = '#00ffcc';
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`Target: ${Math.floor(this.targetFrequency)}Hz`, this.width / 2, 25);
+
+                // Current frequency bar
+                this.ctx.fillStyle = 'rgba(0, 255, 204, 0.3)';
+                const barWidth = Math.min(this.frequency / 1000 * this.width, this.width);
+                this.ctx.fillRect(0, 70, barWidth, 10);
+                this.ctx.strokeStyle = '#00ffcc';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeRect(0, 70, this.width, 10);
+
+                // Grid cells
+                for (let row = 0; row < this.gridSize; row++) {
+                    for (let col = 0; col < this.gridSize; col++) {
+                        const cell = this.grid[row][col];
+                        const pulse = cell.pulseValue / 10;
+                        const size = cell.size + pulse * 5;
+
+                        this.ctx.fillStyle = cell.active ? '#00ffcc' : 'rgba(0, 255, 204, 0.3)';
+                        this.ctx.beginPath();
+                        this.ctx.arc(cell.x, cell.y, size / 2, 0, Math.PI * 2);
+                        this.ctx.fill();
+
+                        // Cell border
+                        this.ctx.strokeStyle = cell.active ? '#00ffcc' : 'rgba(0, 255, 204, 0.5)';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.stroke();
+
+                        // Cell value
+                        this.ctx.fillStyle = cell.active ? '#0a0a2e' : '#00ffcc';
+                        this.ctx.font = 'bold 16px Arial';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.fillText(cell.value, cell.x, cell.y);
+
+                        // Pulse ring
+                        if (pulse > 0) {
+                            this.ctx.strokeStyle = `rgba(0, 255, 204, ${1 - pulse})`;
+                            this.ctx.lineWidth = 2;
+                            this.ctx.beginPath();
+                            this.ctx.arc(cell.x, cell.y, size / 2 + 10, 0, Math.PI * 2);
+                            this.ctx.stroke();
+                        }
+                    }
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 25;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Combo display and HUD
+                if (this.combo > 0) {
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 20px Arial';
+                    this.ctx.textAlign = 'left';
+                    this.ctx.fillText(`COMBO: ${this.combo}`, 10, this.height - 20);
+                }
+
+                // Bottom HUD
+                this.ctx.fillStyle = '#00ffcc';
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Level: ${this.level}`, 10, this.height - 40);
+                this.ctx.fillText(`Mistakes: ${this.mistakes}/${this.maxMistakes}`, 10, this.height - 20);
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(`Accuracy: ${Math.floor(this.accuracy)}%`, this.width - 10, this.height - 40);
+                this.ctx.fillText(`Time: ${Math.ceil(this.timeLeft / 60)}s`, this.width - 10, this.height - 20);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffcc';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff6b6b';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('SIGNAL LOST', this.width / 2, this.height / 2 - 30);
+                    this.ctx.font = '14px Arial';
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 10);
+                    this.ctx.fillText(`Level: ${this.level}`, this.width / 2, this.height / 2 + 30);
+                }
+            },
+
+            setupInput() {
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const col = Math.floor((x - 20) / this.cellSize);
+                    const row = Math.floor((y - 100) / this.cellSize);
+
+                    if (this.gameRunning && !this.gamePaused) {
+                        this.clickCell(col, row);
+                    }
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        this.togglePause();
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

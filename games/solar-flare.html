@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOLAR FLARE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #0a0e27, #16213e);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff6b00;
+            background: radial-gradient(circle, #1a1a2e, #0f0f1e);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(255, 107, 0, 0.5);
+        }
+        .info {
+            color: #ff6b00;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ff6b00;
+            text-shadow: 0 0 10px rgba(255, 107, 0, 0.7);
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ff6b00;
+            color: #0a0e27;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 10px rgba(255, 107, 0, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #ff6b00;">☀ SOLAR FLARE ☀</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Level: <span id="level">1</span> | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">Arrow Keys to move • SPACE to dash</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            player: { x: 175, y: 500, width: 25, height: 25, speed: 5, dashCooldown: 0, shield: 0, lives: 3 },
+            flares: [],
+            explosions: [],
+            particles: [],
+            powerups: [],
+            score: 0,
+            level: 1,
+            highScore: localStorage.getItem('solarFlareHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            flareSpawnRate: 30,
+            keys: {},
+            streak: 0,
+            maxStreak: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 500, width: 25, height: 25, speed: 5, dashCooldown: 0, shield: 0, lives: 3 };
+                this.flares = [];
+                this.explosions = [];
+                this.particles = [];
+                this.powerups = [];
+                this.score = 0;
+                this.level = 1;
+                this.streak = 0;
+                this.maxStreak = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.flareSpawnRate = 30;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Player movement
+                if (this.keys['ArrowLeft'] && this.player.x > 0) this.player.x -= this.player.speed;
+                if (this.keys['ArrowRight'] && this.player.x < this.width - this.player.width) this.player.x += this.player.speed;
+                if (this.keys['ArrowUp'] && this.player.y > 100) this.player.y -= this.player.speed;
+                if (this.keys['ArrowDown'] && this.player.y < this.height - this.player.height) this.player.y += this.player.speed;
+
+                // Dash cooldown
+                if (this.player.dashCooldown > 0) this.player.dashCooldown--;
+
+                // Spawn flares
+                this.frameCount++;
+                if (this.frameCount % this.flareSpawnRate === 0) {
+                    this.spawnFlare();
+                    // Increase spawn rate slightly as difficulty progresses
+                    if (this.level > 1) {
+                        this.flareSpawnRate = Math.max(12, 30 - this.level * 2);
+                    }
+                }
+
+                // Update flares
+                for (let i = this.flares.length - 1; i >= 0; i--) {
+                    const flare = this.flares[i];
+                    flare.y += flare.speed;
+
+                    // Collision with player
+                    if (this.checkCollision(this.player, flare)) {
+                        this.createExplosion(flare.x, flare.y);
+                        this.flares.splice(i, 1);
+                        if (this.player.shield > 0) {
+                            this.player.shield--;
+                        } else {
+                            this.player.lives--;
+                            if (this.player.lives <= 0) {
+                                this.endGame();
+                                return;
+                            }
+                        }
+                        this.streak = 0;
+                        return;
+                    }
+
+                    if (flare.y > this.height) {
+                        this.flares.splice(i, 1);
+                        this.score += 10;
+                        this.streak++;
+                        if (this.streak > this.maxStreak) this.maxStreak = this.streak;
+                        if (this.streak % 5 === 0) this.spawnPowerup(flare.x);
+                        this.updateLevel();
+                    }
+                }
+
+                // Update powerups
+                for (let i = this.powerups.length - 1; i >= 0; i--) {
+                    const pu = this.powerups[i];
+                    pu.y -= 2;
+                    if (this.checkCollision(this.player, pu)) {
+                        this.activatePowerup(pu.type);
+                        this.powerups.splice(i, 1);
+                    } else if (pu.y < 0) {
+                        this.powerups.splice(i, 1);
+                    }
+                }
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+            },
+
+            spawnFlare() {
+                const x = Math.random() * (this.width - 20);
+                this.flares.push({ x, y: -20, width: 20, height: 20, speed: 2 + this.level * 0.5 });
+            },
+
+            spawnPowerup(x) {
+                const types = ['shield', 'slowdown'];
+                this.powerups.push({
+                    x, y: this.height / 2,
+                    radius: 8,
+                    type: types[Math.floor(Math.random() * types.length)],
+                    color: Math.random() > 0.5 ? '#00ff00' : '#ffff00'
+                });
+            },
+
+            activatePowerup(type) {
+                if (type === 'shield') {
+                    this.player.shield = Math.min(3, this.player.shield + 1);
+                } else if (type === 'slowdown') {
+                    this.flareSpawnRate = Math.min(50, this.flareSpawnRate + 10);
+                }
+                this.score += 50;
+            },
+
+            checkCollision(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            createExplosion(x, y) {
+                this.explosions.push({ x, y, radius: 1, maxRadius: 30 });
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3,
+                        life: 20,
+                        color: `hsl(${Math.random() * 60 + 20}, 100%, 50%)`
+                    });
+                }
+            },
+
+            updateLevel() {
+                if (this.score > 0 && this.score % 100 === 0) {
+                    this.level++;
+                    this.flareSpawnRate = Math.max(15, 30 - this.level * 2);
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('solarFlareHigh', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                const gradient = this.ctx.createRadialGradient(this.width / 2, 0, 0, this.width / 2, 0, this.width);
+                gradient.addColorStop(0, '#2a1a0f');
+                gradient.addColorStop(1, '#0a0e27');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Stars
+                this.ctx.fillStyle = '#fff';
+                for (let i = 0; i < 20; i++) {
+                    const x = (this.frameCount * 0.1 + i * 20) % this.width;
+                    const y = (i * 30) % this.height;
+                    this.ctx.fillRect(x, y, 2, 2);
+                }
+
+                // Flares
+                this.ctx.fillStyle = '#ff6b00';
+                for (let flare of this.flares) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(flare.x + 10, flare.y + 10, 10, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#ffa500';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 20;
+                    this.ctx.fillRect(p.x, p.y, 3, 3);
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Explosions
+                for (let exp of this.explosions) {
+                    exp.radius = Math.min(exp.radius + 2, exp.maxRadius);
+                    this.ctx.strokeStyle = `rgba(255, 107, 0, ${1 - exp.radius / exp.maxRadius})`;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.arc(exp.x + 10, exp.y + 10, exp.radius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                }
+                this.explosions = this.explosions.filter(e => e.radius < e.maxRadius);
+
+                // Powerups
+                this.ctx.fillStyle = '#ffff00';
+                for (let pu of this.powerups) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(pu.x, pu.y, pu.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = pu.color;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Player
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.strokeStyle = '#00aa00';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.player.x - 2, this.player.y - 2, this.player.width + 4, this.player.height + 4);
+
+                // Shield indicator
+                if (this.player.shield > 0) {
+                    this.ctx.strokeStyle = '#00aaff';
+                    this.ctx.lineWidth = 3;
+                    for (let i = 0; i < this.player.shield; i++) {
+                        this.ctx.beginPath();
+                        this.ctx.arc(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2, 20 + i * 5, 0, Math.PI * 2);
+                        this.ctx.globalAlpha = 0.5;
+                        this.ctx.stroke();
+                        this.ctx.globalAlpha = 1;
+                    }
+                }
+
+                // Lives indicator
+                this.ctx.fillStyle = '#ff0000';
+                this.ctx.font = 'bold 14px Arial';
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(`Lives: ${this.player.lives}`, this.width - 10, 30);
+                this.ctx.fillText(`Streak: ${this.streak}`, this.width - 10, 50);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff6b00';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff6b00';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('SOLAR STORM!', this.width / 2, this.height / 2 - 40);
+                    this.ctx.font = '14px Arial';
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 0);
+                    this.ctx.fillText(`Level: ${this.level}`, this.width / 2, this.height / 2 + 22);
+                    this.ctx.fillText(`Streak: ${this.maxStreak}`, this.width / 2, this.height / 2 + 44);
+                    this.ctx.fillText(`High Score: ${this.highScore}`, this.width / 2, this.height / 2 + 66);
+                }
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        if (this.gameRunning && !this.gamePaused && this.player.dashCooldown === 0) {
+                            this.player.dashCooldown = 20;
+                        }
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

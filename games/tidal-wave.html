@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIDAL WAVE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #006994, #003d5c);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #0099cc, #006994);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0, 150, 200, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #ccc; }
+        button {
+            padding: 8px 16px;
+            background: #0088aa;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #00aacc; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌊 TIDAL WAVE 🌊</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>UP/DOWN ARROW to surf the wave</p>
+                <p>Ride the tidal wave without falling!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 180, y: 300, width: 20, height: 20, speed: 4 },
+            wave: { y: 200, amplitude: 40, frequency: 0.02, phase: 0 },
+            obstacles: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            highScore: localStorage.getItem('tidal-wave-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 180, y: 300, width: 20, height: 20, speed: 4 };
+                this.wave = { y: 200, amplitude: 40, frequency: 0.02, phase: 0 };
+                this.obstacles = [];
+                this.score = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+            },
+
+            getWaveHeight(x) {
+                return this.wave.y + Math.sin((x / this.width) * Math.PI * 2 + this.wave.phase) * this.wave.amplitude;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Handle input - move player up and down on the wave
+                if (this.keys['ArrowUp'] || this.keys['w']) {
+                    if (this.player.y > 50) this.player.y -= this.player.speed;
+                }
+                if (this.keys['ArrowDown'] || this.keys['s']) {
+                    if (this.player.y < this.height - 50) this.player.y += this.player.speed;
+                }
+
+                // Update wave
+                this.wave.phase += this.wave.frequency;
+
+                // Get target wave height at player position
+                const targetWaveY = this.getWaveHeight(this.player.x) - this.player.height / 2;
+
+                // Check if player is on the wave (with some tolerance)
+                if (Math.abs(this.player.y - targetWaveY) > 30) {
+                    this.endGame();
+                }
+
+                // Spawn obstacles
+                this.frameCount++;
+                if (this.frameCount % 60 === 0) {
+                    this.obstacles.push({
+                        x: Math.random() * (this.width - 25),
+                        y: -30,
+                        width: 25,
+                        height: 25,
+                        vy: 2 + this.score / 500
+                    });
+                }
+
+                // Update obstacles
+                for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                    const obs = this.obstacles[i];
+                    obs.y += obs.vy;
+
+                    if (obs.y > this.height) {
+                        this.obstacles.splice(i, 1);
+                        this.score++;
+                    } else if (this.checkCollision(this.player, obs)) {
+                        this.endGame();
+                    }
+                }
+
+                // Difficulty increase
+                if (this.score % 20 === 0 && this.score > 0) {
+                    this.wave.amplitude = Math.max(30, 40 - this.score / 50);
+                    this.wave.frequency = 0.02 + this.score / 2000;
+                }
+            },
+
+            checkCollision(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('tidal-wave-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Sky
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0099cc');
+                gradient.addColorStop(1, '#006994');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw water waves
+                this.ctx.fillStyle = 'rgba(0, 150, 200, 0.3)';
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, this.height);
+                for (let x = 0; x <= this.width; x += 5) {
+                    const y = this.getWaveHeight(x);
+                    this.ctx.lineTo(x, y);
+                }
+                this.ctx.lineTo(this.width, this.height);
+                this.ctx.fill();
+
+                // Draw wave outline
+                this.ctx.strokeStyle = '#00ffff';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, this.getWaveHeight(0));
+                for (let x = 0; x <= this.width; x += 3) {
+                    const y = this.getWaveHeight(x);
+                    this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+
+                // Draw obstacles
+                this.ctx.fillStyle = '#ff6600';
+                for (let obs of this.obstacles) {
+                    this.ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                    this.ctx.fillStyle = '#ffaa00';
+                    this.ctx.fillRect(obs.x + 3, obs.y + 3, obs.width - 6, obs.height - 6);
+                    this.ctx.fillStyle = '#ff6600';
+                }
+
+                // Draw player (surfer)
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.fillStyle = '#ffcc00';
+                this.ctx.beginPath();
+                this.ctx.arc(this.player.x + 10, this.player.y - 5, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Score and info
+                this.ctx.fillStyle = '#00ffff';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffff';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('WIPEOUT!', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

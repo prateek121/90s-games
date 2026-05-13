@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VELOCITY ZERO - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #1a1a3a, #0d0d1a);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ccff;
+            background: #0d0d1a;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 204, 255, 0.5);
+        }
+        .info {
+            color: #00ccff;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ccff;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ccff;
+            color: #0d0d1a;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 10px rgba(0, 204, 255, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #00ccff;">⚛ VELOCITY ZERO ⚛</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Level: <span id="level">1</span> | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">Click/Drag to apply force • Stop the ball at target</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            ball: { x: 200, y: 300, vx: 0, vy: 0, radius: 10, friction: 0.99 },
+            target: { x: 200, y: 100, radius: 15 },
+            obstacles: [],
+            particles: [],
+            score: 0,
+            level: 1,
+            highScore: localStorage.getItem('velocityZeroHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            levelComplete: false,
+            levelCompleteTimer: 0,
+            attempts: 0,
+            maxAttempts: 5,
+            bestTime: 0,
+            currentTime: 0,
+            targetReached: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.ball = { x: 200, y: 300, vx: 0, vy: 0, radius: 10, friction: 0.99 };
+                this.target = { x: 50 + Math.random() * 300, y: 80 + Math.random() * 150, radius: 15 };
+                this.obstacles = this.generateObstacles();
+                this.particles = [];
+                this.score = 0;
+                this.level = 1;
+                this.attempts = 0;
+                this.maxAttempts = 5;
+                this.bestTime = Infinity;
+                this.currentTime = 0;
+                this.targetReached = false;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.levelComplete = false;
+                this.levelCompleteTimer = 0;
+            },
+
+            generateObstacles() {
+                const obstacles = [];
+                const count = 2 + this.level;
+                for (let i = 0; i < count; i++) {
+                    obstacles.push({
+                        x: 50 + Math.random() * 300,
+                        y: 150 + Math.random() * 300,
+                        width: 30 + Math.random() * 40,
+                        height: 10 + Math.random() * 20,
+                        rotation: Math.random() * Math.PI
+                    });
+                }
+                return obstacles;
+            },
+
+            applyForce(fx, fy) {
+                this.ball.vx += fx * 0.02;
+                this.ball.vy += fy * 0.02;
+                for (let i = 0; i < 5; i++) {
+                    this.particles.push({
+                        x: this.ball.x,
+                        y: this.ball.y,
+                        vx: Math.random() * 2 - 1,
+                        vy: Math.random() * 2 - 1,
+                        life: 15,
+                        color: '#00ccff'
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Ball physics
+                this.ball.x += this.ball.vx;
+                this.ball.y += this.ball.vy;
+                this.ball.vx *= this.ball.friction;
+                this.ball.vy *= this.ball.friction;
+
+                // Boundary collision
+                if (this.ball.x - this.ball.radius < 0 || this.ball.x + this.ball.radius > this.width) {
+                    this.ball.vx *= -0.8;
+                    this.ball.x = Math.max(this.ball.radius, Math.min(this.width - this.ball.radius, this.ball.x));
+                }
+                if (this.ball.y - this.ball.radius < 0 || this.ball.y + this.ball.radius > this.height) {
+                    this.ball.vy *= -0.8;
+                    this.ball.y = Math.max(this.ball.radius, Math.min(this.height - this.ball.radius, this.ball.y));
+                }
+
+                // Obstacle collision
+                for (let obs of this.obstacles) {
+                    this.checkObstacleCollision(obs);
+                }
+
+                // Target check
+                const dist = Math.hypot(this.ball.x - this.target.x, this.ball.y - this.target.y);
+                const speed = Math.hypot(this.ball.vx, this.ball.vy);
+
+                if (!this.targetReached && dist < this.ball.radius + this.target.radius + 10) {
+                    this.targetReached = true;
+                    this.currentTime = this.frameCount;
+                }
+
+                if (this.targetReached && dist < this.ball.radius + this.target.radius) {
+                    if (speed < 1.5) {
+                        this.levelComplete = true;
+                        this.levelCompleteTimer = 30;
+                        const timeBonus = Math.max(0, 500 - this.currentTime);
+                        this.score += (200 * this.level) + timeBonus;
+                        if (this.currentTime < this.bestTime) {
+                            this.bestTime = this.currentTime;
+                        }
+                        this.level++;
+                    }
+                } else if (dist > 150) {
+                    this.targetReached = false;
+                }
+
+                // Particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                if (this.levelComplete) {
+                    this.levelCompleteTimer--;
+                    if (this.levelCompleteTimer === 0) {
+                        this.attempts++;
+                        if (this.attempts >= this.maxAttempts) {
+                            this.endGame();
+                            return;
+                        }
+                        this.ball = { x: 200, y: 300, vx: 0, vy: 0, radius: 10, friction: 0.99 };
+                        this.target = { x: 50 + Math.random() * 300, y: 80 + Math.random() * 150, radius: 15 };
+                        this.obstacles = this.generateObstacles();
+                        this.levelComplete = false;
+                        this.targetReached = false;
+                    }
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+            },
+
+            checkObstacleCollision(obs) {
+                const dx = this.ball.x - Math.max(obs.x - obs.width / 2, Math.min(this.ball.x, obs.x + obs.width / 2));
+                const dy = this.ball.y - Math.max(obs.y - obs.height / 2, Math.min(this.ball.y, obs.y + obs.height / 2));
+                if (dx * dx + dy * dy < this.ball.radius * this.ball.radius) {
+                    this.ball.vx *= -0.6;
+                    this.ball.vy *= -0.6;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 0) {
+                        this.ball.x += (dx / dist) * this.ball.radius;
+                        this.ball.y += (dy / dist) * this.ball.radius;
+                    }
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('velocityZeroHigh', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#1a1a3a');
+                gradient.addColorStop(1, '#0d0d1a');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Grid pattern
+                this.ctx.strokeStyle = 'rgba(0, 204, 255, 0.05)';
+                this.ctx.lineWidth = 1;
+                for (let x = 0; x < this.width; x += 40) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.height);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y < this.height; y += 40) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.width, y);
+                    this.ctx.stroke();
+                }
+
+                // Obstacles
+                this.ctx.fillStyle = '#ff6b6b';
+                for (let obs of this.obstacles) {
+                    this.ctx.save();
+                    this.ctx.translate(obs.x, obs.y);
+                    this.ctx.rotate(obs.rotation);
+                    this.ctx.fillRect(-obs.width / 2, -obs.height / 2, obs.width, obs.height);
+                    this.ctx.restore();
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 15;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Target
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.beginPath();
+                this.ctx.arc(this.target.x, this.target.y, this.target.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#00aa00';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // Ball
+                this.ctx.fillStyle = '#00ccff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#0099cc';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // Velocity vector
+                this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.ball.x, this.ball.y);
+                this.ctx.lineTo(this.ball.x + this.ball.vx * 20, this.ball.y + this.ball.vy * 20);
+                this.ctx.stroke();
+
+                // Speed indicator
+                const speed = Math.hypot(this.ball.vx, this.ball.vy);
+                this.ctx.fillStyle = '#00ccff';
+                this.ctx.font = '12px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Speed: ${speed.toFixed(2)}`, 10, 30);
+                this.ctx.fillText(`Attempt: ${this.attempts + 1}/${this.maxAttempts}`, 10, 50);
+                if (this.bestTime !== Infinity) {
+                    this.ctx.fillText(`Best Time: ${this.bestTime}f`, 10, 70);
+                }
+                this.ctx.textAlign = 'right';
+                this.ctx.fillText(`Level: ${this.level}`, this.width - 10, 30);
+
+                if (this.levelComplete) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('ZERO VELOCITY!', this.width / 2, this.height / 2 - 20);
+                    this.ctx.font = '14px Arial';
+                    this.ctx.fillText(`Time: ${this.currentTime}f`, this.width / 2, this.height / 2 + 20);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('MISSION FAILED', this.width / 2, this.height / 2 - 30);
+                    this.ctx.font = '14px Arial';
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 10);
+                    this.ctx.fillText(`Levels: ${this.level}`, this.width / 2, this.height / 2 + 30);
+                }
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ccff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+            },
+
+            setupInput() {
+                let dragStart = null;
+                this.canvas.addEventListener('mousedown', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                });
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (dragStart && this.gameRunning && !this.gamePaused) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        const current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                        const force = { x: dragStart.x - current.x, y: dragStart.y - current.y };
+                        this.applyForce(force.x, force.y);
+                        dragStart = current;
+                    }
+                });
+                this.canvas.addEventListener('mouseup', () => {
+                    dragStart = null;
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        this.togglePause();
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

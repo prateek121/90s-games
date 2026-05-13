@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast Reflex - Action Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #ff1a1a 0%, #cc0000 100%);
+            font-family: 'Arial', sans-serif;
+            color: #ffff00;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 15px #ffff00;
+            border: 3px solid #ffff00;
+            padding: 15px 30px;
+            background: rgba(255, 255, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .stat {
+            border: 2px solid #ffff00;
+            padding: 10px 20px;
+            background: rgba(255, 255, 0, 0.1);
+        }
+
+        .stat span {
+            color: #00ff00;
+        }
+
+        #canvas {
+            border: 4px solid #ffff00;
+            background: #000;
+            cursor: none;
+            box-shadow: 0 0 30px rgba(255, 255, 0, 0.5);
+        }
+
+        .message {
+            min-height: 30px;
+            font-size: 1.4em;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff4444;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #ffff00, #ffaa00);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.6);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .instruction {
+            text-align: center;
+            font-size: 1.1em;
+            color: #ffff00;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>FAST REFLEX</h1>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Hits: <span id="hits">0</span></div>
+            <div class="stat">Time: <span id="time">30</span>s</div>
+        </div>
+        <div class="instruction">Click the targets as fast as possible!</div>
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        class Target {
+            constructor() {
+                this.radius = 30;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
+                this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                this.pulsePhase = 0;
+            }
+
+            contains(x, y) {
+                const dx = x - this.x;
+                const dy = y - this.y;
+                return Math.sqrt(dx * dx + dy * dy) < this.radius;
+            }
+
+            draw(ctx) {
+                const pulse = Math.sin(this.pulsePhase) * 0.2 + 0.8;
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = pulse;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                this.pulsePhase += 0.1;
+            }
+
+            update() {
+                this.x += (Math.random() - 0.5) * 3;
+                this.y += (Math.random() - 0.5) * 3;
+
+                this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+            }
+        }
+
+        class FastReflex {
+            constructor() {
+                this.score = 0;
+                this.hits = 0;
+                this.timeLeft = 30;
+                this.gameActive = true;
+                this.target = new Target();
+                this.difficulty = 1;
+                this.mousePos = { x: 0, y: 0 };
+
+                this.setupEventListeners();
+                this.startTimer();
+            }
+
+            setupEventListeners() {
+                canvas.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    this.mousePos.x = e.clientX - rect.left;
+                    this.mousePos.y = e.clientY - rect.top;
+                });
+
+                canvas.addEventListener('click', (e) => {
+                    if (!this.gameActive) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    if (this.target.contains(x, y)) {
+                        this.hitTarget();
+                    } else {
+                        this.missTarget();
+                    }
+                });
+            }
+
+            hitTarget() {
+                const points = Math.round(100 + 10 * this.difficulty);
+                this.score += points;
+                this.hits++;
+                document.getElementById('message').textContent = `+${points}`;
+                document.getElementById('message').className = 'message success';
+
+                this.difficulty = Math.min(5, 1 + Math.floor(this.hits / 5));
+                this.target = new Target();
+                this.updateUI();
+            }
+
+            missTarget() {
+                document.getElementById('message').textContent = 'Miss!';
+                document.getElementById('message').className = 'message error';
+            }
+
+            startTimer() {
+                setInterval(() => {
+                    if (this.gameActive) {
+                        this.timeLeft--;
+                        document.getElementById('time').textContent = this.timeLeft;
+
+                        if (this.timeLeft <= 0) {
+                            this.endGame();
+                        }
+                    }
+                }, 1000);
+            }
+
+            endGame() {
+                this.gameActive = false;
+                const accuracy = this.hits > 0 ? (this.hits / (this.hits + 5)) * 100 : 0;
+                document.getElementById('message').textContent =
+                    `Game Over! Score: ${this.score} | Hits: ${this.hits}`;
+                document.getElementById('message').className = 'message success';
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('hits').textContent = this.hits;
+            }
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Grid
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.1)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < canvas.width; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i, canvas.height);
+                    ctx.stroke();
+                }
+                for (let i = 0; i < canvas.height; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, i);
+                    ctx.lineTo(canvas.width, i);
+                    ctx.stroke();
+                }
+
+                // Draw target
+                this.target.draw(ctx);
+                this.target.update();
+
+                // Draw crosshair
+                const crossSize = 15;
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.mousePos.x - crossSize, this.mousePos.y);
+                ctx.lineTo(this.mousePos.x + crossSize, this.mousePos.y);
+                ctx.moveTo(this.mousePos.x, this.mousePos.y - crossSize);
+                ctx.lineTo(this.mousePos.x, this.mousePos.y + crossSize);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(this.mousePos.x, this.mousePos.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffff00';
+                ctx.fill();
+            }
+
+            update() {
+                this.draw();
+                requestAnimationFrame(() => this.update());
+            }
+
+            reset() {
+                this.score = 0;
+                this.hits = 0;
+                this.timeLeft = 30;
+                this.gameActive = true;
+                this.difficulty = 1;
+                this.target = new Target();
+                this.updateUI();
+                document.getElementById('message').textContent = '';
+            }
+        }
+
+        const game = new FastReflex();
+        game.update();
+
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('fastReflexHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('fastReflexHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

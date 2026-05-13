@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUICK TAP - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff006e;
+            background: linear-gradient(to bottom, #2c1a2e, #4a1a4f);
+            display: block;
+            box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);
+        }
+        .info {
+            color: #ff006e;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 0, 110, 0.1);
+            border: 2px solid #ff006e;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ff006e;
+            color: #fff;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 0, 110, 0.1);
+            border: 2px solid #ff006e;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Streak</div>
+                <div class="stat-value" id="streak">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>RULES:</strong><br/>
+                Tap green circles<br/>
+                Avoid red circles<br/>
+                Build your streak!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 500,
+
+            circles: [],
+            score: 0,
+            streak: 0,
+            best: localStorage.getItem('quickTapBest') || 0,
+            gameRunning: false,
+            gameOver: false,
+            spawnRate: 100,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Spawn new circles
+                if (Math.random() < this.spawnRate / 1000) {
+                    this.circles.push({
+                        x: Math.random() * (this.width - 40) + 20,
+                        y: -20,
+                        radius: 20,
+                        type: Math.random() > 0.8 ? 'red' : 'green',
+                        vy: 2 + Math.random() * 2,
+                        clicked: false
+                    });
+                }
+
+                // Update circles
+                for (let i = this.circles.length - 1; i >= 0; i--) {
+                    const circle = this.circles[i];
+                    circle.y += circle.vy;
+
+                    // Off screen
+                    if (circle.y > this.height) {
+                        if (!circle.clicked && circle.type === 'green') {
+                            this.streak = 0;
+                        }
+                        this.circles.splice(i, 1);
+                    }
+                }
+
+                // Increase difficulty
+                this.spawnRate = Math.min(150, 100 + this.score / 10);
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#2c1a2e');
+                gradient.addColorStop(1, '#4a1a4f');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw circles
+                for (let circle of this.circles) {
+                    this.ctx.fillStyle = circle.type === 'green' ? '#00ff00' : '#ff0000';
+                    this.ctx.beginPath();
+                    this.ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff006e';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff006e';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 20);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Score: ${this.score}`, this.width / 2, this.height / 2 + 20);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('streak').textContent = this.streak;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('click', (e) => {
+                    if (!this.gameRunning) {
+                        this.start();
+                        return;
+                    }
+
+                    const rect = this.canvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+
+                    for (let circle of this.circles) {
+                        const dist = Math.hypot(clickX - circle.x, clickY - circle.y);
+                        if (dist < circle.radius && !circle.clicked) {
+                            circle.clicked = true;
+
+                            if (circle.type === 'green') {
+                                this.score += 10;
+                                this.streak++;
+                            } else {
+                                this.gameOver = true;
+                                this.gameRunning = false;
+                                if (this.score > this.best) {
+                                    this.best = this.score;
+                                    localStorage.setItem('quickTapBest', this.best);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                });
+            },
+
+            restart() {
+                this.circles = [];
+                this.score = 0;
+                this.streak = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.spawnRate = 100;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

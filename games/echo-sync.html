@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECHO SYNC - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #0a3a52 0%, #0d6f8f 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ffff;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+        }
+        .info {
+            color: #00ffff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid #00ffff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #00ffff;
+            color: #000;
+            border: 2px solid #00ffff;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
+        .controls {
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid #00ffff;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="480" height="480"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Round</div>
+                <div class="stat-value" id="round">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                Watch the pattern<br/>
+                Click in order<br/>
+                Repeat & extend!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 480,
+            height: 480,
+
+            sequence: [],
+            playerSequence: [],
+            round: 1,
+            score: 0,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('echoSyncBest') || 0,
+            isPlaying: false,
+            playIndex: 0,
+            buttons: [
+                { x: 60, y: 60, w: 180, h: 180, color: '#ff3333' },
+                { x: 240, y: 60, w: 180, h: 180, color: '#33ff33' },
+                { x: 60, y: 240, w: 180, h: 180, color: '#3333ff' },
+                { x: 240, y: 240, w: 180, h: 180, color: '#ffff33' }
+            ],
+            mousePos: { x: -1, y: -1 },
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mousePos.x = e.clientX - rect.left;
+                    this.mousePos.y = e.clientY - rect.top;
+                });
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.handleClick(x, y);
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.sequence = [];
+                    this.playerSequence = [];
+                    this.round = 1;
+                    this.score = 0;
+                    this.playNextRound();
+                }
+            },
+
+            playNextRound() {
+                this.playerSequence = [];
+                const randomButton = Math.floor(Math.random() * 4);
+                this.sequence.push(randomButton);
+                this.isPlaying = true;
+                this.playIndex = 0;
+                this.playSequence();
+            },
+
+            playSequence() {
+                if (this.playIndex >= this.sequence.length) {
+                    this.isPlaying = false;
+                    return;
+                }
+                setTimeout(() => {
+                    const buttonIndex = this.sequence[this.playIndex];
+                    this.buttons[buttonIndex].flash = true;
+                    setTimeout(() => {
+                        this.buttons[buttonIndex].flash = false;
+                        this.playIndex++;
+                        this.playSequence();
+                    }, 400);
+                }, 600);
+            },
+
+            handleClick(x, y) {
+                if (!this.gameRunning || this.isPlaying) return;
+
+                for (let i = 0; i < this.buttons.length; i++) {
+                    const btn = this.buttons[i];
+                    if (x >= btn.x && x < btn.x + btn.w && y >= btn.y && y < btn.y + btn.h) {
+                        this.playerSequence.push(i);
+                        btn.flash = true;
+                        setTimeout(() => {
+                            btn.flash = false;
+                        }, 200);
+
+                        if (this.playerSequence[this.playerSequence.length - 1] !== this.sequence[this.playerSequence.length - 1]) {
+                            this.gameOver = true;
+                            this.gameRunning = false;
+                        } else if (this.playerSequence.length === this.sequence.length) {
+                            this.round++;
+                            this.score += this.round * 10;
+                            setTimeout(() => {
+                                this.playNextRound();
+                            }, 1000);
+                        }
+                        break;
+                    }
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('echoSyncBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw buttons
+                for (let i = 0; i < this.buttons.length; i++) {
+                    const btn = this.buttons[i];
+                    this.ctx.fillStyle = btn.color;
+                    this.ctx.globalAlpha = btn.flash ? 0.8 : 0.5;
+                    this.ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
+                    this.ctx.globalAlpha = 1;
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ffff';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.textAlign = 'center';
+                if (this.isPlaying) {
+                    this.ctx.fillText('WATCH...', this.width / 2, this.height - 10);
+                } else if (this.gameRunning) {
+                    this.ctx.fillText('YOUR TURN', this.width / 2, this.height - 10);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('WRONG!', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('round').textContent = this.round;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.sequence = [];
+                this.playerSequence = [];
+                this.round = 1;
+                this.score = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.isPlaying = false;
+                this.buttons.forEach(btn => btn.flash = false);
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

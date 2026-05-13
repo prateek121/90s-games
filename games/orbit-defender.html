@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ORBIT DEFENDER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #330055 0%, #550033 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ffff00;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 255, 0, 0.6);
+        }
+        .info {
+            color: #ffff00;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 255, 0, 0.1);
+            border: 2px solid #ffff00;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ffff00;
+            color: #000;
+            border: 2px solid #ffff00;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 255, 0, 0.8); }
+        .controls {
+            background: rgba(255, 255, 0, 0.1);
+            border: 2px solid #ffff00;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="480" height="480"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Wave</div>
+                <div class="stat-value" id="wave">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                LEFT/RIGHT Rotate<br/>
+                SPACE Shoot<br/>
+                Defend orbit!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 480,
+            height: 480,
+            centerX: 240,
+            centerY: 240,
+            orbitRadius: 100,
+
+            turret: { angle: 0, speed: 0.05 },
+            enemies: [],
+            projectiles: [],
+            particles: [],
+            score: 0,
+            wave: 1,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('orbitDefenderBest') || 0,
+            waveProgress: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            setupInput() {
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key] = true;
+                    if (e.key === ' ' && this.gameRunning) {
+                        this.shoot();
+                        e.preventDefault();
+                    }
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key] = false;
+                });
+                this.keys = keys;
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.spawnWave();
+                }
+            },
+
+            spawnWave() {
+                const enemyCount = 3 + this.wave;
+                for (let i = 0; i < enemyCount; i++) {
+                    const angle = (Math.PI * 2 / enemyCount) * i;
+                    this.enemies.push({
+                        angle: angle,
+                        speed: 1 + this.wave * 0.1,
+                        radius: 50 + Math.random() * 100,
+                        hp: 1 + Math.floor(this.wave / 3),
+                        maxHp: 1 + Math.floor(this.wave / 3),
+                        color: `hsl(${Math.random() * 60}, 100%, 50%)`
+                    });
+                }
+                this.waveProgress = 0;
+            },
+
+            shoot() {
+                this.projectiles.push({
+                    x: this.centerX + Math.cos(this.turret.angle) * 50,
+                    y: this.centerY + Math.sin(this.turret.angle) * 50,
+                    vx: Math.cos(this.turret.angle) * 7,
+                    vy: Math.sin(this.turret.angle) * 7,
+                    life: 120,
+                    color: '#ffff00'
+                });
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Turret rotation
+                if (this.keys['ArrowLeft']) this.turret.angle -= this.turret.speed;
+                if (this.keys['ArrowRight']) this.turret.angle += this.turret.speed;
+
+                // Update projectiles
+                this.projectiles = this.projectiles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+
+                    // Check collision with enemies
+                    for (let i = this.enemies.length - 1; i >= 0; i--) {
+                        const e = this.enemies[i];
+                        const ex = this.centerX + Math.cos(e.angle) * e.radius;
+                        const ey = this.centerY + Math.sin(e.angle) * e.radius;
+                        const dx = p.x - ex;
+                        const dy = p.y - ey;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 25) {
+                            e.hp--;
+                            this.particles.push({ x: ex, y: ey, life: 10, size: 15 });
+                            if (e.hp <= 0) {
+                                this.enemies.splice(i, 1);
+                                this.score += 50 * this.wave;
+                                this.waveProgress++;
+                            }
+                            return false;
+                        }
+                    }
+                    return p.life > 0;
+                });
+
+                // Update enemies
+                for (let e of this.enemies) {
+                    e.angle += e.speed * 0.02;
+                }
+
+                // Check if enemies reached center
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const e = this.enemies[i];
+                    if (e.radius < 20) {
+                        this.gameOver = true;
+                        return;
+                    }
+                    e.radius -= e.speed * 0.5;
+                }
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                // Wave progression
+                if (this.enemies.length === 0 && this.projectiles.length === 0) {
+                    this.wave++;
+                    this.spawnWave();
+                }
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('orbitDefenderBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw orbit
+                this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.2)';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX, this.centerY, this.orbitRadius, 0, Math.PI * 2);
+                this.ctx.stroke();
+
+                // Draw center planet
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX, this.centerY, 20, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Draw turret
+                this.ctx.strokeStyle = '#ffff00';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.centerX, this.centerY);
+                this.ctx.lineTo(
+                    this.centerX + Math.cos(this.turret.angle) * 50,
+                    this.centerY + Math.sin(this.turret.angle) * 50
+                );
+                this.ctx.stroke();
+
+                // Draw projectiles
+                for (let p of this.projectiles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Draw enemies
+                for (let e of this.enemies) {
+                    const x = this.centerX + Math.cos(e.angle) * e.radius;
+                    const y = this.centerY + Math.sin(e.angle) * e.radius;
+                    this.ctx.fillStyle = e.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 20, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Health bar
+                    this.ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    this.ctx.fillRect(x - 15, y - 30, 30, 3);
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.fillRect(x - 15, y - 30, (e.hp / e.maxHp) * 30, 3);
+                }
+
+                // Draw particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = `rgba(255, 255, 0, ${p.life / 10})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size * (1 - p.life / 10), 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`WAVE: ${this.wave}`, 10, 20);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 40);
+                this.ctx.fillText(`ENEMIES: ${this.enemies.length}`, 10, 60);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('wave').textContent = this.wave;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.turret = { angle: 0, speed: 0.05 };
+                this.enemies = [];
+                this.projectiles = [];
+                this.particles = [];
+                this.score = 0;
+                this.wave = 1;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.waveProgress = 0;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

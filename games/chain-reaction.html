@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chain Reaction - Action Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #3a1a1a 0%, #1a3a2a 100%);
+            font-family: 'Arial', sans-serif;
+            color: #ffaa00;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 15px #ffaa00;
+            border: 3px solid #ffaa00;
+            padding: 15px 30px;
+            background: rgba(255, 170, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            font-size: 1.2em;
+        }
+
+        .stat {
+            border: 2px solid #ffaa00;
+            padding: 10px 20px;
+            background: rgba(255, 170, 0, 0.05);
+        }
+
+        .stat span {
+            color: #ffff00;
+            font-weight: bold;
+        }
+
+        #canvas {
+            border: 4px solid #ffaa00;
+            background: #000;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(255, 170, 0, 0.4);
+        }
+
+        .message {
+            min-height: 25px;
+            font-size: 1.3em;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff4444;
+        }
+
+        .chain-display {
+            font-size: 1.5em;
+            color: #ffff00;
+            min-height: 30px;
+            text-shadow: 0 0 10px #ffff00;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #ffaa00, #ff8800);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 170, 0, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>CHAIN REACTION</h1>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Moves: <span id="moves">0</span></div>
+            <div class="stat">Time: <span id="time">90</span>s</div>
+        </div>
+        <div class="chain-display" id="chainDisplay"></div>
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        class Orb {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 1, 2, 3, 4
+                this.radius = 25;
+                this.toExplode = false;
+                this.explosionPhase = 0;
+                this.colors = ['#ff0000', '#00ff00', '#0088ff', '#ffff00'];
+            }
+
+            contains(x, y) {
+                const dx = x - this.x;
+                const dy = y - this.y;
+                return Math.sqrt(dx * dx + dy * dy) < this.radius;
+            }
+
+            draw(ctx) {
+                if (this.toExplode) {
+                    ctx.fillStyle = 'rgba(255, 200, 0, ' + (1 - this.explosionPhase) + ')';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * (1 + this.explosionPhase * 2), 0, Math.PI * 2);
+                    ctx.fill();
+                    this.explosionPhase += 0.15;
+                } else {
+                    ctx.fillStyle = this.colors[this.type - 1];
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.type, this.x, this.y);
+                }
+            }
+
+            isExploded() {
+                return this.explosionPhase > 1;
+            }
+        }
+
+        class ChainReaction {
+            constructor() {
+                this.orbs = [];
+                this.score = 0;
+                this.moves = 0;
+                this.timeLeft = 90;
+                this.gameActive = true;
+                this.currentChain = 0;
+                this.maxChain = 0;
+                this.lastChainTime = 0;
+
+                this.init();
+                this.startTimer();
+                this.setupEventListeners();
+            }
+
+            init() {
+                this.orbs = [];
+                const cols = 5;
+                const rows = 4;
+                const spacingX = 150;
+                const spacingY = 110;
+                const startX = 50;
+                const startY = 50;
+
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        const x = startX + col * spacingX;
+                        const y = startY + row * spacingY;
+                        const type = Math.floor(Math.random() * 4) + 1;
+                        this.orbs.push(new Orb(x, y, type));
+                    }
+                }
+            }
+
+            setupEventListeners() {
+                canvas.addEventListener('click', (e) => {
+                    if (!this.gameActive) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.handleClick(x, y);
+                });
+            }
+
+            handleClick(x, y) {
+                let clickedOrb = null;
+                for (let orb of this.orbs) {
+                    if (!orb.toExplode && orb.contains(x, y)) {
+                        clickedOrb = orb;
+                        break;
+                    }
+                }
+
+                if (clickedOrb) {
+                    this.currentChain = 0;
+                    this.lastChainTime = Date.now();
+                    this.triggerChain(clickedOrb);
+                    this.moves++;
+                    this.updateUI();
+                }
+            }
+
+            triggerChain(orb) {
+                const type = orb.type;
+                orb.toExplode = true;
+                this.currentChain++;
+                this.maxChain = Math.max(this.maxChain, this.currentChain);
+
+                const score = 50 * type * this.currentChain;
+                this.score += score;
+
+                const adjacentOrbs = this.getAdjacentOrbs(orb);
+                for (let adjacent of adjacentOrbs) {
+                    if (!adjacent.toExplode && adjacent.type <= type) {
+                        setTimeout(() => this.triggerChain(adjacent), 100 * this.currentChain);
+                    }
+                }
+
+                // Check if matches can still happen
+                if (Date.now() - this.lastChainTime > 1000) {
+                    this.currentChain = 0;
+                }
+
+                this.refillOrbs();
+            }
+
+            getAdjacentOrbs(orb) {
+                const adjacent = [];
+                for (let other of this.orbs) {
+                    if (other === orb) continue;
+                    const dx = other.x - orb.x;
+                    const dy = other.y - orb.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < 80) {
+                        adjacent.push(other);
+                    }
+                }
+                return adjacent;
+            }
+
+            refillOrbs() {
+                // Remove exploded orbs
+                this.orbs = this.orbs.filter(orb => {
+                    if (orb.isExploded()) {
+                        return false;
+                    }
+                    return true;
+                });
+
+                // Add new orbs
+                while (this.orbs.length < 20) {
+                    const x = Math.random() * (canvas.width - 100) + 50;
+                    const y = -50;
+                    const type = Math.floor(Math.random() * 4) + 1;
+                    this.orbs.push(new Orb(x, y, type));
+                }
+
+                if (this.orbs.length === 0) {
+                    this.score += 500;
+                    this.init();
+                }
+            }
+
+            startTimer() {
+                setInterval(() => {
+                    if (this.gameActive) {
+                        this.timeLeft--;
+                        document.getElementById('time').textContent = this.timeLeft;
+
+                        if (this.timeLeft <= 0) {
+                            this.endGame();
+                        }
+                    }
+                }, 1000);
+            }
+
+            endGame() {
+                this.gameActive = false;
+                document.getElementById('message').textContent = `Game Over! Score: ${this.score}`;
+                document.getElementById('message').className = 'message success';
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('moves').textContent = this.moves;
+                document.getElementById('chainDisplay').textContent =
+                    this.currentChain > 0 ? `CHAIN x${this.currentChain}` : '';
+            }
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = 'rgba(255, 170, 0, 0.1)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < canvas.width; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i, canvas.height);
+                    ctx.stroke();
+                }
+
+                for (let orb of this.orbs) {
+                    orb.draw(ctx);
+                }
+
+                this.updateUI();
+            }
+
+            update() {
+                this.draw();
+                requestAnimationFrame(() => this.update());
+            }
+
+            reset() {
+                this.score = 0;
+                this.moves = 0;
+                this.timeLeft = 90;
+                this.gameActive = true;
+                this.currentChain = 0;
+                this.maxChain = 0;
+                document.getElementById('message').textContent = '';
+                this.init();
+            }
+        }
+
+        const game = new ChainReaction();
+        game.update();
+
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('chainReactionHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('chainReactionHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

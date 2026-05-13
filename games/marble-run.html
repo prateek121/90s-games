@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MARBLE RUN - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #60a5fa;
+            background: linear-gradient(to bottom, #0c4a6e, #164e63);
+            display: block;
+            box-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
+        }
+        .info {
+            color: #60a5fa;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(96, 165, 250, 0.1);
+            border: 2px solid #60a5fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #60a5fa;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(96, 165, 250, 0.1);
+            border: 2px solid #60a5fa;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="600"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Marbles</div>
+                <div class="stat-value" id="marbles">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Height</div>
+                <div class="stat-value" id="height">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                CLICK/DRAG Tilt<br/>
+                Guide marble down<br/>
+                Collect stars!
+            </div>
+            <button onclick="game.reset()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 600,
+
+            marble: { x: 250, y: 50, vx: 0, vy: 0, radius: 8 },
+            platforms: [],
+            stars: [],
+            score: 0,
+            marbleCount: 0,
+            highestY: 0,
+            tiltX: 0,
+            tiltY: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.generatePlatforms();
+                this.generateStars();
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            generatePlatforms() {
+                this.platforms = [];
+                for (let i = 0; i < 8; i++) {
+                    const y = 80 + i * 60;
+                    const x = Math.random() * (this.width - 100);
+                    this.platforms.push({
+                        x: x,
+                        y: y,
+                        width: 100,
+                        height: 12,
+                        angle: (Math.random() - 0.5) * 0.3
+                    });
+                }
+            },
+
+            generateStars() {
+                this.stars = [];
+                for (let i = 0; i < 5; i++) {
+                    this.stars.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * this.height,
+                        collected: false
+                    });
+                }
+            },
+
+            update() {
+                // Physics
+                this.marble.vy += 0.4;
+                this.marble.vx += this.tiltX * 0.1;
+                this.marble.vy += this.tiltY * 0.1;
+
+                // Friction
+                this.marble.vx *= 0.98;
+                this.marble.vy *= 0.99;
+
+                this.marble.x += this.marble.vx;
+                this.marble.y += this.marble.vy;
+
+                // Wall collision
+                if (this.marble.x - this.marble.radius < 0) {
+                    this.marble.x = this.marble.radius;
+                    this.marble.vx = -this.marble.vx * 0.8;
+                }
+                if (this.marble.x + this.marble.radius > this.width) {
+                    this.marble.x = this.width - this.marble.radius;
+                    this.marble.vx = -this.marble.vx * 0.8;
+                }
+
+                // Platform collision
+                for (let platform of this.platforms) {
+                    const dx = this.marble.x - Math.max(platform.x, Math.min(this.marble.x, platform.x + platform.width));
+                    const dy = this.marble.y - Math.max(platform.y, Math.min(this.marble.y, platform.y + platform.height));
+
+                    if (dx * dx + dy * dy < this.marble.radius * this.marble.radius) {
+                        if (this.marble.vy > 0) {
+                            this.marble.y = platform.y - this.marble.radius;
+                            this.marble.vy = -this.marble.vy * 0.8;
+                            this.marble.vx += platform.angle * 5;
+                        }
+                    }
+                }
+
+                // Star collision
+                for (let star of this.stars) {
+                    if (!star.collected &&
+                        Math.hypot(this.marble.x - star.x, this.marble.y - star.y) < 20) {
+                        star.collected = true;
+                        this.score += 100;
+                    }
+                }
+
+                // Track height
+                if (this.marble.y < this.highestY) {
+                    this.highestY = this.marble.y;
+                }
+
+                // Fall off
+                if (this.marble.y > this.height) {
+                    this.resetMarble();
+                    this.marbleCount++;
+                }
+            },
+
+            resetMarble() {
+                this.marble = { x: 250, y: 50, vx: 0, vy: 0, radius: 8 };
+                this.highestY = 0;
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0c4a6e');
+                gradient.addColorStop(1, '#164e63');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Platforms
+                for (let platform of this.platforms) {
+                    this.ctx.save();
+                    this.ctx.translate(platform.x + platform.width / 2, platform.y + platform.height / 2);
+                    this.ctx.rotate(platform.angle);
+                    this.ctx.fillStyle = '#60a5fa';
+                    this.ctx.fillRect(-platform.width / 2, -platform.height / 2, platform.width, platform.height);
+                    this.ctx.restore();
+                }
+
+                // Stars
+                for (let star of this.stars) {
+                    if (!star.collected) {
+                        this.ctx.fillStyle = '#fbbf24';
+                        this.ctx.beginPath();
+                        for (let i = 0; i < 5; i++) {
+                            const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+                            const x = star.x + Math.cos(angle) * 8;
+                            const y = star.y + Math.sin(angle) * 8;
+                            if (i === 0) this.ctx.moveTo(x, y);
+                            else this.ctx.lineTo(x, y);
+                        }
+                        this.ctx.closePath();
+                        this.ctx.fill();
+                    }
+                }
+
+                // Marble
+                this.ctx.fillStyle = '#ef4444';
+                this.ctx.beginPath();
+                this.ctx.arc(this.marble.x, this.marble.y, this.marble.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // HUD
+                this.ctx.fillStyle = '#60a5fa';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('marbles').textContent = this.marbleCount;
+                document.getElementById('height').textContent = Math.floor(600 - this.highestY);
+            },
+
+            setupInput() {
+                document.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const centerX = this.width / 2;
+                    const centerY = this.height / 2;
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    this.tiltX = (mouseX - centerX) / 100;
+                    this.tiltY = (mouseY - centerY) / 100;
+                });
+
+                document.addEventListener('mouseleave', () => {
+                    this.tiltX = 0;
+                    this.tiltY = 0;
+                });
+            },
+
+            reset() {
+                this.marble = { x: 250, y: 50, vx: 0, vy: 0, radius: 8 };
+                this.score = 0;
+                this.marbleCount = 0;
+                this.highestY = 0;
+                this.generateStars();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROTATOR - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: #1a1a2e;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.4);
+        }
+        .info {
+            color: #fff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #fff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #fff;
+            color: #f97316;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #fff;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                LEFT/RIGHT Rotate<br/>
+                Match rings<br/>
+                Speed increases!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 500,
+
+            centerX: 250,
+            centerY: 250,
+            rings: [],
+            rotator: { angle: 0, angularVelocity: 0 },
+            score: 0,
+            level: 1,
+            best: localStorage.getItem('rotatorBest') || 0,
+            gameRunning: false,
+            gameOver: false,
+            baseSpeed: 2,
+            rotationSpeed: 5,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.generateRings();
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            generateRings() {
+                this.rings = [];
+                const ringCount = 3 + this.level;
+                for (let i = 0; i < ringCount; i++) {
+                    const radius = 80 + i * 40;
+                    const speed = this.baseSpeed + this.level * 0.2;
+                    this.rings.push({
+                        radius: radius,
+                        rotation: Math.random() * Math.PI * 2,
+                        speed: (Math.random() > 0.5 ? 1 : -1) * speed,
+                        segmentCount: 8,
+                        color: `hsl(${(i * 60) % 360}, 100%, 50%)`
+                    });
+                }
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Rotate rings
+                for (let ring of this.rings) {
+                    ring.rotation += ring.speed * 0.05;
+                }
+
+                // Check matches
+                for (let ring of this.rings) {
+                    const segmentAngle = (Math.PI * 2) / ring.segmentCount;
+                    const rotatorSnappedAngle = Math.round(this.rotator.angle / segmentAngle) * segmentAngle;
+                    const ringSnappedAngle = Math.round(ring.rotation / segmentAngle) * segmentAngle;
+
+                    const diff = Math.abs(rotatorSnappedAngle - ringSnappedAngle);
+                    if (diff < 0.1 || diff > Math.PI * 2 - 0.1) {
+                        this.score += 10 * this.level;
+                        ring.speed *= 1.1;
+                    }
+                }
+
+                // Rotator deceleration
+                this.rotator.angularVelocity *= 0.95;
+                this.rotator.angle += this.rotator.angularVelocity;
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('rotatorBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#1a1a2e';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw rings
+                for (let ring of this.rings) {
+                    this.ctx.strokeStyle = ring.color;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.centerX, this.centerY, ring.radius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+
+                    // Draw segments
+                    const segmentAngle = (Math.PI * 2) / ring.segmentCount;
+                    for (let i = 0; i < ring.segmentCount; i++) {
+                        const angle = ring.rotation + i * segmentAngle;
+                        const x1 = this.centerX + Math.cos(angle) * ring.radius;
+                        const y1 = this.centerY + Math.sin(angle) * ring.radius;
+                        const x2 = this.centerX + Math.cos(angle) * (ring.radius + 15);
+                        const y2 = this.centerY + Math.sin(angle) * (ring.radius + 15);
+
+                        this.ctx.strokeStyle = ring.color;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x1, y1);
+                        this.ctx.lineTo(x2, y2);
+                        this.ctx.stroke();
+                    }
+                }
+
+                // Draw rotator
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 4;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.centerX, this.centerY);
+                const rotatorX = this.centerX + Math.cos(this.rotator.angle) * 60;
+                const rotatorY = this.centerY + Math.sin(this.rotator.angle) * 60;
+                this.ctx.lineTo(rotatorX, rotatorY);
+                this.ctx.stroke();
+
+                // Draw center dot
+                this.ctx.fillStyle = '#fff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX, this.centerY, 8, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // HUD
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+                this.ctx.fillText(`Level: ${this.level}`, 10, 50);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowLeft') {
+                        this.rotator.angularVelocity -= this.rotationSpeed;
+                    }
+                    if (e.key === 'ArrowRight') {
+                        this.rotator.angularVelocity += this.rotationSpeed;
+                    }
+                    if (e.key === ' ' && !this.gameRunning) {
+                        this.start();
+                    }
+                });
+            },
+
+            restart() {
+                this.rings = [];
+                this.rotator = { angle: 0, angularVelocity: 0 };
+                this.score = 0;
+                this.level = 1;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.generateRings();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

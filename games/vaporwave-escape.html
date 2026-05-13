@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaporwave Escape</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #ff006e 0%, #8338ec 50%, #3a86ff 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: linear-gradient(to bottom, rgba(255, 0, 110, 0.1), rgba(131, 56, 236, 0.1));
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3), inset 0 0 30px rgba(255, 0, 110, 0.1);
+            padding: 30px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: #ff006e;
+            margin-bottom: 10px;
+            font-size: 2em;
+            text-shadow: 0 0 20px #8338ec;
+            font-style: italic;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #00ffff;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 20px 0;
+            color: #00ffff;
+        }
+
+        .stat {
+            background: rgba(0, 255, 255, 0.1);
+            padding: 10px;
+            border: 1px solid #ff006e;
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.75em;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        canvas {
+            background: linear-gradient(180deg, #1a0033 0%, #330066 100%);
+            border: 2px solid #ff006e;
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(255, 0, 110, 0.3);
+        }
+
+        .instructions {
+            color: #00ffff;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        button {
+            background: linear-gradient(90deg, #ff006e, #8338ec);
+            color: #fff;
+            border: none;
+            padding: 10px 30px;
+            margin: 10px 5px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        button:hover:not(:disabled) {
+            box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .message {
+            color: #00ffff;
+            font-size: 1em;
+            margin: 15px 0;
+            text-shadow: 0 0 10px #ff006e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VAPORWAVE ESCAPE</h1>
+        <p class="subtitle">Lost in the aesthetic</p>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">TIME</div>
+                <div class="stat-value" id="time">60</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">COLLECTED</div>
+                <div class="stat-value" id="collected">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="400"></canvas>
+
+        <div class="instructions">
+            <p>Arrow Keys to Move | Collect Shapes | Avoid Red</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <button id="startBtn" onclick="game.start()">Enter</button>
+        <button onclick="location.reload()">Reset</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            running: false,
+            score: 0,
+            collected: 0,
+            timeLeft: 60,
+            startTime: 0,
+
+            player: {
+                x: 225,
+                y: 350,
+                width: 25,
+                height: 25,
+                speed: 4,
+                rotation: 0
+            },
+
+            items: [],
+            hazards: [],
+            particles: [],
+            keys: {},
+
+            init() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            start() {
+                this.running = true;
+                this.score = 0;
+                this.collected = 0;
+                this.timeLeft = 60;
+                this.startTime = Date.now();
+                this.items = [];
+                this.hazards = [];
+                this.particles = [];
+                document.getElementById('startBtn').disabled = true;
+                this.spawnItems();
+                this.spawnHazards();
+                this.update();
+            },
+
+            spawnItems() {
+                for (let i = 0; i < 8; i++) {
+                    this.items.push({
+                        x: Math.random() * (canvas.width - 20),
+                        y: Math.random() * (canvas.height - 80),
+                        width: 20,
+                        height: 20,
+                        rotation: Math.random() * Math.PI * 2,
+                        collected: false,
+                        color: ['#ff006e', '#8338ec', '#3a86ff', '#00ffff'][Math.floor(Math.random() * 4)]
+                    });
+                }
+            },
+
+            spawnHazards() {
+                for (let i = 0; i < 3; i++) {
+                    this.hazards.push({
+                        x: Math.random() * (canvas.width - 30),
+                        y: Math.random() * (canvas.height - 100),
+                        width: 30,
+                        height: 30,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        rotation: 0
+                    });
+                }
+            },
+
+            createParticles(x, y, color) {
+                for (let i = 0; i < 8; i++) {
+                    this.particles.push({
+                        x,
+                        y,
+                        vx: (Math.random() - 0.5) * 5,
+                        vy: (Math.random() - 0.5) * 5 - 1,
+                        life: 20,
+                        color
+                    });
+                }
+            },
+
+            update() {
+                if (!this.running) return;
+
+                this.timeLeft = Math.max(0, 60 - Math.floor((Date.now() - this.startTime) / 1000));
+
+                // Player movement
+                if (this.keys['ArrowLeft'] || this.keys['a']) this.player.x -= this.player.speed;
+                if (this.keys['ArrowRight'] || this.keys['d']) this.player.x += this.player.speed;
+                if (this.keys['ArrowUp'] || this.keys['w']) this.player.y -= this.player.speed;
+                if (this.keys['ArrowDown'] || this.keys['s']) this.player.y += this.player.speed;
+
+                this.player.x = Math.max(0, Math.min(canvas.width - this.player.width, this.player.x));
+                this.player.y = Math.max(0, Math.min(canvas.height - this.player.height, this.player.y));
+
+                // Rotate player
+                if (this.keys['ArrowLeft'] || this.keys['a']) this.player.rotation -= 0.1;
+                if (this.keys['ArrowRight'] || this.keys['d']) this.player.rotation += 0.1;
+
+                // Move hazards
+                for (const hazard of this.hazards) {
+                    hazard.x += hazard.vx;
+                    hazard.y += hazard.vy;
+                    hazard.rotation += 0.05;
+
+                    if (hazard.x <= 0 || hazard.x + hazard.width >= canvas.width) hazard.vx *= -1;
+                    if (hazard.y <= 0 || hazard.y + hazard.height >= canvas.height - 80) hazard.vy *= -1;
+
+                    if (this.collides(this.player, hazard)) {
+                        this.running = false;
+                        document.getElementById('message').textContent = 'Escaped: ' + this.collected + ' | Score: ' + this.score;
+                        document.getElementById('startBtn').disabled = false;
+                        this.saveScore();
+                        return;
+                    }
+                }
+
+                // Collect items
+                for (let i = this.items.length - 1; i >= 0; i--) {
+                    if (!this.items[i].collected && this.collides(this.player, this.items[i])) {
+                        this.score += 100;
+                        this.collected++;
+                        this.createParticles(this.items[i].x, this.items[i].y, this.items[i].color);
+                        this.items[i].collected = true;
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    this.particles[i].x += this.particles[i].vx;
+                    this.particles[i].y += this.particles[i].vy;
+                    this.particles[i].life--;
+                    if (this.particles[i].life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                if (this.timeLeft <= 0) {
+                    this.running = false;
+                    document.getElementById('message').textContent = 'TIME UP! Collected: ' + this.collected + ' | Score: ' + this.score;
+                    document.getElementById('startBtn').disabled = false;
+                    this.saveScore();
+                    return;
+                }
+
+                this.draw();
+                this.updateUI();
+                requestAnimationFrame(() => this.update());
+            },
+
+            collides(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            draw() {
+                ctx.fillStyle = '#1a0033';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw grid pattern
+                ctx.strokeStyle = 'rgba(131, 56, 236, 0.1)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < canvas.width; i += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i, canvas.height);
+                    ctx.stroke();
+                }
+
+                // Draw items
+                for (const item of this.items) {
+                    if (!item.collected) {
+                        ctx.save();
+                        ctx.translate(item.x + item.width / 2, item.y + item.height / 2);
+                        ctx.rotate(item.rotation);
+                        ctx.fillStyle = item.color;
+                        ctx.fillRect(-item.width / 2, -item.height / 2, item.width, item.height);
+                        ctx.restore();
+                    }
+                }
+
+                // Draw hazards
+                for (const hazard of this.hazards) {
+                    ctx.save();
+                    ctx.translate(hazard.x + hazard.width / 2, hazard.y + hazard.height / 2);
+                    ctx.rotate(hazard.rotation);
+                    ctx.fillStyle = 'rgba(255, 0, 110, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Draw player
+                ctx.save();
+                ctx.translate(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2);
+                ctx.rotate(this.player.rotation);
+                ctx.fillStyle = '#00ffff';
+                ctx.fillRect(-this.player.width / 2, -this.player.height / 2, this.player.width, this.player.height);
+                ctx.restore();
+
+                // Draw particles
+                for (const p of this.particles) {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life / 20;
+                    ctx.fillRect(p.x, p.y, 4, 4);
+                    ctx.globalAlpha = 1;
+                }
+            },
+
+            updateUI() {
+                document.getElementById('time').textContent = this.timeLeft;
+                document.getElementById('collected').textContent = this.collected;
+                document.getElementById('score').textContent = this.score;
+            },
+
+            saveScore() {
+                let scores = JSON.parse(localStorage.getItem('vaporScores') || '[]');
+                scores.push({ score: this.score, collected: this.collected, date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.score - a.score);
+                localStorage.setItem('vaporScores', JSON.stringify(scores.slice(0, 10)));
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

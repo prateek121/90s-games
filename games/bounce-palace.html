@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOUNCE PALACE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #fbbf24;
+            background: linear-gradient(to bottom, #1f2937, #111827);
+            display: block;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+        }
+        .info {
+            color: #fbbf24;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(251, 191, 36, 0.1);
+            border: 2px solid #fbbf24;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #fbbf24;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(251, 191, 36, 0.1);
+            border: 2px solid #fbbf24;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Bounces</div>
+                <div class="stat-value" id="bounces">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                CLICK Bounce ball<br/>
+                Keep it in air<br/>
+                Collect power-ups!
+            </div>
+            <button onclick="game.reset()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 500,
+
+            ball: { x: 250, y: 250, vx: 2, vy: 2, radius: 8 },
+            bouncePoints: [],
+            powerUps: [],
+            score: 0,
+            bounces: 0,
+            best: localStorage.getItem('bouncePalaceBest') || 0,
+            gameActive: true,
+            lastBounceTime: 0,
+            bounceTimeout: 3000,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            update() {
+                if (!this.gameActive) return;
+
+                // Ball movement with damping
+                this.ball.x += this.ball.vx;
+                this.ball.y += this.ball.vy;
+
+                // Gravity
+                this.ball.vy += 0.3;
+
+                // Wall bounces
+                if (this.ball.x - this.ball.radius < 0 || this.ball.x + this.ball.radius > this.width) {
+                    this.ball.vx = -this.ball.vx * 0.95;
+                    this.ball.x = Math.max(this.ball.radius, Math.min(this.width - this.ball.radius, this.ball.x));
+                }
+                if (this.ball.y - this.ball.radius < 0) {
+                    this.ball.vy = -this.ball.vy * 0.95;
+                    this.ball.y = this.ball.radius;
+                }
+
+                // Bounce point collision
+                for (let i = this.bouncePoints.length - 1; i >= 0; i--) {
+                    const point = this.bouncePoints[i];
+                    const dist = Math.hypot(this.ball.x - point.x, this.ball.y - point.y);
+
+                    if (dist < this.ball.radius + point.radius) {
+                        this.ball.vy = -Math.abs(this.ball.vy) * 1.2;
+                        this.ball.y = point.y - point.radius - this.ball.radius;
+                        this.bouncePoints.splice(i, 1);
+                        this.bounces++;
+                        this.score += 10;
+                        this.lastBounceTime = Date.now();
+                        this.createParticles(point.x, point.y);
+                    }
+                }
+
+                // Power-up collision
+                for (let i = this.powerUps.length - 1; i >= 0; i--) {
+                    const pu = this.powerUps[i];
+                    const dist = Math.hypot(this.ball.x - pu.x, this.ball.y - pu.y);
+
+                    if (dist < this.ball.radius + 10) {
+                        this.applyPowerUp(pu.type);
+                        this.powerUps.splice(i, 1);
+                    }
+                }
+
+                // Generate new bounce points
+                if (this.bouncePoints.length < 5 + Math.floor(this.bounces / 10)) {
+                    this.bouncePoints.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * (this.height * 0.8),
+                        radius: 15,
+                        pulse: 0
+                    });
+                }
+
+                // Game over if no bounce in timeout
+                if (Date.now() - this.lastBounceTime > this.bounceTimeout && this.bounces > 0) {
+                    this.gameActive = false;
+                    if (this.score > this.best) {
+                        this.best = this.score;
+                        localStorage.setItem('bouncePalaceBest', this.best);
+                    }
+                }
+
+                // Fall off screen
+                if (this.ball.y > this.height) {
+                    this.gameActive = false;
+                    if (this.score > this.best) {
+                        this.best = this.score;
+                        localStorage.setItem('bouncePalaceBest', this.best);
+                    }
+                }
+
+                // Update pulse animations
+                for (let point of this.bouncePoints) {
+                    point.pulse += 0.1;
+                }
+            },
+
+            applyPowerUp(type) {
+                switch (type) {
+                    case 'slow':
+                        this.ball.vx *= 0.7;
+                        this.ball.vy *= 0.7;
+                        this.score += 50;
+                        break;
+                    case 'expand':
+                        this.bounceTimeout += 1000;
+                        this.score += 100;
+                        break;
+                    case 'multiply':
+                        this.bouncePoints.push({
+                            x: Math.random() * this.width,
+                            y: Math.random() * (this.height * 0.8),
+                            radius: 15,
+                            pulse: 0
+                        });
+                        this.score += 75;
+                        break;
+                }
+            },
+
+            createParticles(x, y) {
+                for (let i = 0; i < 5; i++) {
+                    const angle = (Math.PI * 2 * i) / 5;
+                    // Particles dissipate naturally
+                }
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#1f2937');
+                gradient.addColorStop(1, '#111827');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Bounce points
+                for (let point of this.bouncePoints) {
+                    const radius = point.radius + Math.sin(point.pulse) * 3;
+                    this.ctx.fillStyle = `rgba(251, 191, 36, ${0.5 + Math.sin(point.pulse) * 0.3})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    this.ctx.strokeStyle = '#fbbf24';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Power-ups
+                for (let pu of this.powerUps) {
+                    this.ctx.fillStyle = '#22c55e';
+                    this.ctx.fillRect(pu.x - 10, pu.y - 10, 20, 20);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 12px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(pu.type[0].toUpperCase(), pu.x, pu.y + 4);
+                }
+
+                // Ball
+                this.ctx.fillStyle = '#ec4899';
+                this.ctx.beginPath();
+                this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // HUD
+                this.ctx.fillStyle = '#fbbf24';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+                this.ctx.fillText(`Bounces: ${this.bounces}`, 10, 45);
+
+                if (!this.gameActive) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fbbf24';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 20);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 20);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('bounces').textContent = this.bounces;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('click', () => {
+                    if (!this.gameActive) {
+                        this.reset();
+                    }
+                });
+            },
+
+            reset() {
+                this.ball = { x: 250, y: 250, vx: 2, vy: 2, radius: 8 };
+                this.bouncePoints = [];
+                this.powerUps = [];
+                this.score = 0;
+                this.bounces = 0;
+                this.gameActive = true;
+                this.lastBounceTime = Date.now();
+                this.bounceTimeout = 3000;
+
+                for (let i = 0; i < 5; i++) {
+                    this.bouncePoints.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * (this.height * 0.8),
+                        radius: 15,
+                        pulse: 0
+                    });
+                }
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

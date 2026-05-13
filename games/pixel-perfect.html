@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Perfect</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(45deg, #330000, #660000);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            background: linear-gradient(to bottom, #000, #330000);
+            border: 4px solid #ff6600;
+            box-shadow: 0 0 20px rgba(255, 102, 0, 0.5), inset 0 0 20px rgba(255, 102, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #ff6600;
+            text-shadow: 0 0 10px #ff6600;
+            margin-bottom: 10px;
+            font-size: 2em;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            color: #ff6600;
+            font-size: 0.9em;
+        }
+
+        .stat {
+            background: rgba(255, 102, 0, 0.1);
+            padding: 8px;
+            border: 2px solid #ff6600;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        canvas {
+            background: #000;
+            border: 3px solid #ff6600;
+            display: block;
+            margin: 15px auto;
+            box-shadow: 0 0 15px rgba(255, 102, 0, 0.3);
+            image-rendering: pixelated;
+        }
+
+        .controls {
+            color: #ff6600;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        button {
+            background: #ff6600;
+            color: #000;
+            border: none;
+            padding: 10px 30px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #ff8800;
+            box-shadow: 0 0 10px #ff6600;
+        }
+
+        .message {
+            color: #00ff00;
+            font-size: 1.1em;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PIXEL PERFECT</h1>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">COMBOS</div>
+                <div class="stat-value" id="combo">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">LEVEL</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="400"></canvas>
+
+        <div class="controls">
+            <p>Click to Match Pixels | Chain Combos for Bonus Points</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <button id="startBtn" onclick="game.start()">START GAME</button>
+        <button onclick="location.reload()">RESET</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            running: false,
+            score: 0,
+            combo: 0,
+            level: 1,
+            timeLeft: 60,
+            startTime: 0,
+
+            colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
+            grid: [],
+            gridSize: 6,
+            tileSize: 60,
+            selected: null,
+
+            init() {
+                canvas.addEventListener('click', (e) => this.handleClick(e));
+            },
+
+            start() {
+                this.running = true;
+                this.score = 0;
+                this.combo = 0;
+                this.level = 1;
+                this.timeLeft = 60;
+                this.startTime = Date.now();
+                document.getElementById('startBtn').disabled = true;
+                this.generateGrid();
+                this.update();
+            },
+
+            generateGrid() {
+                this.grid = [];
+                for (let i = 0; i < this.gridSize; i++) {
+                    this.grid[i] = [];
+                    for (let j = 0; j < this.gridSize; j++) {
+                        this.grid[i][j] = {
+                            color: this.colors[Math.floor(Math.random() * this.colors.length)],
+                            matched: false
+                        };
+                    }
+                }
+                this.selected = null;
+            },
+
+            handleClick(e) {
+                if (!this.running) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const col = Math.floor(x / this.tileSize);
+                const row = Math.floor(y / this.tileSize);
+
+                if (col >= 0 && col < this.gridSize && row >= 0 && row < this.gridSize) {
+                    if (!this.selected) {
+                        this.selected = { row, col };
+                    } else {
+                        this.tryMatch(row, col);
+                    }
+                }
+            },
+
+            tryMatch(row, col) {
+                const selected = this.selected;
+                const tile1 = this.grid[selected.row][selected.col];
+                const tile2 = this.grid[row][col];
+
+                if (selected.row === row && selected.col === col) {
+                    this.selected = null;
+                    return;
+                }
+
+                if (tile1.color === tile2.color) {
+                    this.combo++;
+                    const points = 100 + (this.combo * 50) + (this.level * 25);
+                    this.score += points;
+
+                    tile1.matched = true;
+                    tile2.matched = true;
+
+                    setTimeout(() => this.fillMatched(), 200);
+                } else {
+                    this.combo = 0;
+                }
+                this.selected = null;
+            },
+
+            fillMatched() {
+                for (let i = 0; i < this.gridSize; i++) {
+                    for (let j = 0; j < this.gridSize; j++) {
+                        if (this.grid[i][j].matched) {
+                            this.grid[i][j] = {
+                                color: this.colors[Math.floor(Math.random() * this.colors.length)],
+                                matched: false
+                            };
+                        }
+                    }
+                }
+            },
+
+            update() {
+                if (!this.running) return;
+
+                this.timeLeft = Math.max(0, 60 - Math.floor((Date.now() - this.startTime) / 1000));
+
+                if (this.timeLeft <= 0) {
+                    this.running = false;
+                    document.getElementById('message').textContent = 'TIME UP! Final Score: ' + this.score;
+                    document.getElementById('startBtn').disabled = false;
+                    this.saveScore();
+                    return;
+                }
+
+                // Increase difficulty
+                if (this.score > (this.level * 2000)) {
+                    this.level++;
+                }
+
+                this.draw();
+                this.updateUI();
+                requestAnimationFrame(() => this.update());
+            },
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw grid
+                for (let i = 0; i < this.gridSize; i++) {
+                    for (let j = 0; j < this.gridSize; j++) {
+                        const x = j * this.tileSize + 20;
+                        const y = i * this.tileSize + 40;
+                        const tile = this.grid[i][j];
+
+                        ctx.fillStyle = tile.color;
+                        ctx.fillRect(x, y, this.tileSize - 2, this.tileSize - 2);
+
+                        if (this.selected && this.selected.row === i && this.selected.col === j) {
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(x - 2, y - 2, this.tileSize, this.tileSize);
+                        } else {
+                            ctx.strokeStyle = '#444';
+                            ctx.lineWidth = 1;
+                            ctx.strokeRect(x, y, this.tileSize - 2, this.tileSize - 2);
+                        }
+                    }
+                }
+
+                // Draw time
+                ctx.fillStyle = '#ff6600';
+                ctx.font = 'bold 16px Courier New';
+                ctx.textAlign = 'left';
+                ctx.fillText('TIME: ' + this.timeLeft, 20, 25);
+            },
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('combo').textContent = this.combo;
+                document.getElementById('level').textContent = this.level;
+            },
+
+            saveScore() {
+                let scores = JSON.parse(localStorage.getItem('pixelScores') || '[]');
+                scores.push({ score: this.score, combo: this.combo, date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.score - a.score);
+                localStorage.setItem('pixelScores', JSON.stringify(scores.slice(0, 10)));
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

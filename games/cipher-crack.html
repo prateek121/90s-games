@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cipher Crack - Puzzle Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a3a3a 0%, #2d5a5a 100%);
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 15px #00ff88;
+            border: 2px solid #00ff88;
+            padding: 15px 30px;
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            font-size: 1.1em;
+        }
+
+        .stat {
+            border: 1px solid #00ff88;
+            padding: 8px 15px;
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .cipher-text {
+            text-align: center;
+            font-size: 1.3em;
+            border: 2px solid #00ff88;
+            padding: 20px;
+            background: rgba(0, 255, 136, 0.05);
+            min-width: 500px;
+            line-height: 1.6;
+            letter-spacing: 2px;
+            word-break: break-all;
+        }
+
+        .keyboard {
+            display: grid;
+            grid-template-columns: repeat(13, 1fr);
+            gap: 5px;
+            width: 650px;
+            padding: 15px;
+            border: 2px solid #00ff88;
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .key-button {
+            padding: 8px;
+            background: #1a3a3a;
+            border: 1px solid #00ff88;
+            color: #00ff88;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        .key-button:hover {
+            background: #00ff88;
+            color: #1a3a3a;
+            transform: scale(1.1);
+        }
+
+        .key-button.mapped {
+            background: #00ff88;
+            color: #1a3a3a;
+        }
+
+        .key-button.incorrect {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .mapping-display {
+            border: 2px solid #00ff88;
+            padding: 15px;
+            background: rgba(0, 255, 136, 0.05);
+            width: 650px;
+            font-size: 0.9em;
+            line-height: 1.8;
+        }
+
+        .mapping-pair {
+            display: inline-block;
+            margin-right: 15px;
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            padding: 10px 25px;
+            font-size: 1em;
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            color: #1a3a3a;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-family: 'Courier New', monospace;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .message {
+            min-height: 25px;
+            font-size: 1.1em;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>CIPHER CRACK</h1>
+            <p style="font-size: 0.9em; opacity: 0.8;">Map each encrypted letter to the correct plaintext</p>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Level: <span id="level">1</span></div>
+            <div class="stat">Hints: <span id="hints">3</span></div>
+        </div>
+        <div class="cipher-text" id="cipherText"></div>
+        <div class="keyboard" id="keyboard"></div>
+        <div class="mapping-display" id="mappingDisplay"></div>
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.hint()">Use Hint</button>
+            <button onclick="game.reset()">New Game</button>
+        </div>
+    </div>
+
+    <script>
+        class CipherCrack {
+            constructor() {
+                this.score = 0;
+                this.level = 1;
+                this.hints = 3;
+                this.gameActive = true;
+                this.mapping = {}; // encrypted -> decrypted
+                this.reverseMapping = {}; // decrypted -> encrypted
+                this.correctMappings = 0;
+
+                this.init();
+                this.setupEventListeners();
+            }
+
+            init() {
+                this.hints = 3;
+                this.correctMappings = 0;
+                this.mapping = {};
+                this.reverseMapping = {};
+
+                this.plaintext = this.generatePlaintext();
+                this.ciphertext = this.encryptText(this.plaintext);
+
+                this.displayCiphertext();
+                this.buildKeyboard();
+                this.updateMappingDisplay();
+                this.updateUI();
+            }
+
+            generatePlaintext() {
+                const phrases = [
+                    'THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG',
+                    'CODING IS FUN AND CHALLENGING',
+                    'PUZZLE GAMES KEEP YOUR MIND SHARP',
+                    'DECRYPT THIS SECRET MESSAGE NOW',
+                    'ENJOY PLAYING CIPHER CRACK GAME',
+                    'ARTIFICIAL INTELLIGENCE IS AMAZING',
+                    'WELCOME TO THE PUZZLE CHALLENGE'
+                ];
+
+                return phrases[Math.floor(Math.random() * phrases.length)].substring(0, 30 + this.level * 5);
+            }
+
+            encryptText(text) {
+                const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                let shuffled = alphabet.split('').sort(() => Math.random() - 0.5).join('');
+
+                let encrypted = '';
+                for (let char of text) {
+                    if (alphabet.includes(char)) {
+                        encrypted += shuffled[alphabet.indexOf(char)];
+                    } else {
+                        encrypted += char;
+                    }
+                }
+
+                this.correctMapping = {};
+                for (let i = 0; i < alphabet.length; i++) {
+                    this.correctMapping[shuffled[i]] = alphabet[i];
+                }
+
+                return encrypted;
+            }
+
+            displayCiphertext() {
+                document.getElementById('cipherText').textContent = this.ciphertext;
+            }
+
+            buildKeyboard() {
+                const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                const keyboard = document.getElementById('keyboard');
+                keyboard.innerHTML = '';
+
+                for (let char of alphabet) {
+                    const btn = document.createElement('button');
+                    btn.textContent = char;
+                    btn.className = 'key-button';
+
+                    if (this.mapping[char]) {
+                        btn.textContent = `${char}→${this.mapping[char]}`;
+                        btn.className = 'key-button mapped';
+                    }
+
+                    btn.onclick = () => this.selectLetter(char);
+                    keyboard.appendChild(btn);
+                }
+            }
+
+            selectLetter(char) {
+                if (!this.gameActive) return;
+                if (this.mapping[char]) {
+                    delete this.mapping[char];
+                    delete this.reverseMapping[this.mapping[char]];
+                } else {
+                    // Show input for mapping
+                    const target = prompt(`Map ${char} to which letter?`);
+                    if (target && target.length === 1) {
+                        const upper = target.toUpperCase();
+                        if (this.reverseMapping[upper]) {
+                            delete this.mapping[this.reverseMapping[upper]];
+                        }
+                        this.mapping[char] = upper;
+                        this.reverseMapping[upper] = char;
+
+                        if (upper === this.correctMapping[char]) {
+                            this.correctMappings++;
+                            document.getElementById('message').textContent = 'Correct mapping!';
+                            document.getElementById('message').className = 'message success';
+
+                            if (this.correctMappings === Object.keys(this.correctMapping).length) {
+                                this.levelUp();
+                            }
+                        }
+                    }
+                }
+
+                this.buildKeyboard();
+                this.updateMappingDisplay();
+            }
+
+            updateMappingDisplay() {
+                const display = document.getElementById('mappingDisplay');
+                let html = '';
+
+                for (let encrypted in this.mapping) {
+                    const decrypted = this.mapping[encrypted];
+                    const isCorrect = decrypted === this.correctMapping[encrypted];
+                    const style = isCorrect ? 'color: #00ff00;' : 'color: #ff4444;';
+                    html += `<div class="mapping-pair" style="${style}">${encrypted}→${decrypted}</div>`;
+                }
+
+                display.innerHTML = html || 'No mappings yet...';
+            }
+
+            hint() {
+                if (this.hints <= 0) {
+                    document.getElementById('message').textContent = 'No hints left!';
+                    document.getElementById('message').className = 'message error';
+                    return;
+                }
+
+                const unmapped = Object.keys(this.correctMapping).filter(char => !this.mapping[char]);
+                if (unmapped.length > 0) {
+                    const char = unmapped[Math.floor(Math.random() * unmapped.length)];
+                    this.mapping[char] = this.correctMapping[char];
+                    this.reverseMapping[this.correctMapping[char]] = char;
+                    this.correctMappings++;
+                    this.hints--;
+
+                    document.getElementById('message').textContent = `Hint: ${char}→${this.correctMapping[char]}`;
+                    document.getElementById('message').className = 'message success';
+
+                    if (this.correctMappings === Object.keys(this.correctMapping).length) {
+                        this.levelUp();
+                    }
+
+                    this.buildKeyboard();
+                    this.updateMappingDisplay();
+                    this.updateUI();
+                }
+            }
+
+            levelUp() {
+                this.score += 100 * this.level;
+                this.level++;
+                document.getElementById('message').textContent = `Level ${this.level}!`;
+                document.getElementById('message').className = 'message success';
+                setTimeout(() => this.init(), 1500);
+            }
+
+            setupEventListeners() {
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('hints').textContent = this.hints;
+            }
+
+            reset() {
+                this.score = 0;
+                this.level = 1;
+                this.gameActive = true;
+                this.init();
+            }
+        }
+
+        const game = new CipherCrack();
+
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('cipherCrackHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('cipherCrackHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

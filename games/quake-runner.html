@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUAKE RUNNER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #8b6f47, #5d4b38);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #d4a574, #a67d3d);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(200, 100, 0, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #eee; }
+        button {
+            padding: 8px 16px;
+            background: #cc6600;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #ee8800; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 QUAKE RUNNER 🌍</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>SPACE to jump, LEFT/RIGHT to move</p>
+                <p>Avoid the cracks in the earth!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 175, y: 480, width: 25, height: 25, vy: 0, gravity: 0.6, jumpPower: -12, onGround: true },
+            platforms: [],
+            cracks: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            shakeIntensity: 0,
+            highScore: localStorage.getItem('quake-runner-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.generatePlatforms();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            generatePlatforms() {
+                this.platforms = [];
+                for (let i = 0; i < 10; i++) {
+                    this.platforms.push({
+                        x: Math.random() * (this.width - 80),
+                        y: i * 60,
+                        width: 80,
+                        height: 15
+                    });
+                }
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 480, width: 25, height: 25, vy: 0, gravity: 0.6, jumpPower: -12, onGround: true };
+                this.generatePlatforms();
+                this.cracks = [];
+                this.score = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+                this.shakeIntensity = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Handle input
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    if (this.player.x > 0) this.player.x -= 4;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    if (this.player.x + this.player.width < this.width) this.player.x += 4;
+                }
+                if ((this.keys[' '] || this.keys['w']) && this.player.onGround) {
+                    this.player.vy = this.player.jumpPower;
+                    this.player.onGround = false;
+                    this.shakeIntensity = 2;
+                }
+
+                // Physics
+                this.player.vy += this.player.gravity;
+                this.player.y += this.player.vy;
+
+                // Platform collision
+                this.player.onGround = false;
+                for (let platform of this.platforms) {
+                    if (this.player.vy >= 0 &&
+                        this.player.y + this.player.height >= platform.y &&
+                        this.player.y + this.player.height <= platform.y + platform.height + 10 &&
+                        this.player.x + this.player.width > platform.x &&
+                        this.player.x < platform.x + platform.width) {
+                        this.player.vy = 0;
+                        this.player.y = platform.y - this.player.height;
+                        this.player.onGround = true;
+                    }
+                }
+
+                // Scroll platforms
+                if (this.player.y < 200) {
+                    const diff = 200 - this.player.y;
+                    this.player.y = 200;
+                    for (let p of this.platforms) p.y += diff;
+                    for (let c of this.cracks) c.y += diff;
+                    this.score += Math.floor(diff / 10);
+
+                    // New cracks
+                    if (this.frameCount % 40 === 0) {
+                        this.cracks.push({
+                            x: Math.random() * (this.width - 60),
+                            y: -30,
+                            width: 60,
+                            height: 15
+                        });
+                    }
+                }
+
+                // Update cracks
+                for (let i = this.cracks.length - 1; i >= 0; i--) {
+                    if (this.cracks[i].y > this.height) {
+                        this.cracks.splice(i, 1);
+                    } else if (this.checkCollision(this.player, this.cracks[i])) {
+                        this.endGame();
+                    }
+                }
+
+                // Game over if falling
+                if (this.player.y > this.height) {
+                    this.endGame();
+                }
+
+                this.shakeIntensity *= 0.95;
+                this.frameCount++;
+            },
+
+            checkCollision(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('quake-runner-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                let offsetX = 0, offsetY = 0;
+                if (this.shakeIntensity > 0) {
+                    offsetX = (Math.random() - 0.5) * this.shakeIntensity;
+                    offsetY = (Math.random() - 0.5) * this.shakeIntensity;
+                }
+
+                this.ctx.save();
+                this.ctx.translate(offsetX, offsetY);
+
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#d4a574');
+                gradient.addColorStop(1, '#8b6f47');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw platforms
+                this.ctx.fillStyle = '#8b6f47';
+                for (let p of this.platforms) {
+                    this.ctx.fillRect(p.x, p.y, p.width, p.height);
+                    this.ctx.strokeStyle = '#5d4b38';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(p.x, p.y, p.width, p.height);
+                }
+
+                // Draw cracks
+                this.ctx.fillStyle = '#ff4444';
+                for (let c of this.cracks) {
+                    this.ctx.fillRect(c.x, c.y, c.width, c.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.fillRect(c.x + 5, c.y + 5, c.width - 10, c.height - 10);
+                    this.ctx.fillStyle = '#ff4444';
+                }
+
+                // Draw player
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.fillStyle = '#00dd00';
+                this.ctx.fillRect(this.player.x + 5, this.player.y + 5, 8, 8);
+
+                // Score
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 20px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+
+                this.ctx.restore();
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') e.preventDefault();
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

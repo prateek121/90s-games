@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logic Gate - Puzzle Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Arial', sans-serif;
+            color: #00ff00;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 10px #00ff00;
+            border: 2px solid #00ff00;
+            padding: 15px 30px;
+            background: rgba(0, 255, 0, 0.1);
+            border-radius: 5px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.8;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            font-size: 1.2em;
+        }
+
+        .stat {
+            border: 1px solid #00ff00;
+            padding: 10px 20px;
+            background: rgba(0, 255, 0, 0.05);
+            border-radius: 3px;
+        }
+
+        #canvas {
+            border: 3px solid #00ff00;
+            background: #0a0e27;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #00ff00, #00aa00);
+            color: #000;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .message {
+            text-align: center;
+            font-size: 1.3em;
+            min-height: 25px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff00ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>LOGIC GATE</h1>
+            <p>Complete the circuit by configuring logic gates correctly</p>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Level: <span id="level">1</span></div>
+            <div class="stat">Time: <span id="time">60</span>s</div>
+        </div>
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+            <button onclick="game.togglePause()">Pause</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        class LogicGate {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'AND', 'OR', 'NOT', 'XOR', 'NAND'
+                this.rotation = 0;
+                this.width = 60;
+                this.height = 50;
+                this.selected = false;
+                this.inputA = null;
+                this.inputB = null;
+                this.output = null;
+            }
+
+            contains(x, y) {
+                return x > this.x - this.width/2 && x < this.x + this.width/2 &&
+                       y > this.y - this.height/2 && y < this.y + this.height/2;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+                // Gate body
+                ctx.fillStyle = this.selected ? '#ffff00' : '#00ff00';
+                ctx.globalAlpha = 0.8;
+                ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
+                ctx.globalAlpha = 1;
+
+                // Border
+                ctx.strokeStyle = this.selected ? '#ffff00' : '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
+
+                // Type text
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 10px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.type, 0, 0);
+
+                // Pins
+                ctx.fillStyle = '#ffff00';
+                ctx.fillRect(-this.width/2 - 5, -10, 5, 8);
+                ctx.fillRect(-this.width/2 - 5, 2, 5, 8);
+                ctx.fillRect(this.width/2, -5, 5, 8);
+
+                ctx.restore();
+            }
+
+            evaluate(inputA, inputB = 0) {
+                switch(this.type) {
+                    case 'AND': return inputA && inputB ? 1 : 0;
+                    case 'OR': return inputA || inputB ? 1 : 0;
+                    case 'NOT': return inputA ? 0 : 1;
+                    case 'XOR': return (inputA ^ inputB) ? 1 : 0;
+                    case 'NAND': return (inputA && inputB) ? 0 : 1;
+                    default: return 0;
+                }
+            }
+        }
+
+        class LogicGateGame {
+            constructor() {
+                this.canvas = canvas;
+                this.ctx = ctx;
+                this.gates = [];
+                this.connections = [];
+                this.inputs = [
+                    { x: 50, y: 100, value: 0, label: 'A' },
+                    { x: 50, y: 200, value: 0, label: 'B' }
+                ];
+                this.output = { x: 750, y: 150, expectedValue: 0, label: 'OUT' };
+                this.score = 0;
+                this.level = 1;
+                this.timeLeft = 60;
+                this.gameActive = true;
+                this.isPaused = false;
+                this.selectedGate = null;
+                this.mousePos = { x: 0, y: 0 };
+                this.draggedGate = null;
+
+                this.init();
+                this.startTimer();
+                this.setupEventListeners();
+            }
+
+            init() {
+                this.gates = [];
+                this.connections = [];
+
+                // Add random gates based on level
+                const gateCount = 2 + this.level;
+                const gateTypes = ['AND', 'OR', 'NOT', 'XOR', 'NAND'];
+
+                for (let i = 0; i < gateCount; i++) {
+                    const type = gateTypes[Math.floor(Math.random() * gateTypes.length)];
+                    const x = 200 + (i % 3) * 150;
+                    const y = 150 + Math.floor(i / 3) * 150;
+                    this.gates.push(new LogicGate(x, y, type));
+                }
+
+                // Random target output
+                this.output.expectedValue = Math.random() > 0.5 ? 1 : 0;
+                this.updateInputs();
+            }
+
+            updateInputs() {
+                this.inputs[0].value = Math.random() > 0.5 ? 1 : 0;
+                this.inputs[1].value = Math.random() > 0.5 ? 1 : 0;
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                });
+
+                this.canvas.addEventListener('click', (e) => {
+                    if (this.isPaused || !this.gameActive) return;
+
+                    for (let gate of this.gates) {
+                        if (gate.contains(this.mousePos.x, this.mousePos.y)) {
+                            this.selectGate(gate);
+                            return;
+                        }
+                    }
+                });
+
+                this.canvas.addEventListener('dblclick', (e) => {
+                    if (this.isPaused || !this.gameActive) return;
+
+                    for (let gate of this.gates) {
+                        if (gate.contains(this.mousePos.x, this.mousePos.y)) {
+                            gate.rotation += Math.PI / 2;
+                            return;
+                        }
+                    }
+                });
+
+                window.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') this.checkSolution();
+                    if (e.key === ' ') this.updateInputs();
+                });
+            }
+
+            selectGate(gate) {
+                if (this.selectedGate) this.selectedGate.selected = false;
+                gate.selected = true;
+                this.selectedGate = gate;
+            }
+
+            checkSolution() {
+                let currentValues = [...this.inputs.map(i => i.value)];
+
+                // Simulate circuit
+                for (let gate of this.gates) {
+                    const inputA = currentValues[0] || 0;
+                    const inputB = currentValues[1] || 0;
+                    gate.output = gate.evaluate(inputA, inputB);
+                }
+
+                const finalOutput = this.gates[this.gates.length - 1]?.output || 0;
+
+                if (finalOutput === this.output.expectedValue) {
+                    this.score += 100 * this.level;
+                    this.level++;
+                    document.getElementById('message').textContent = 'Correct! Next puzzle...';
+                    document.getElementById('message').className = 'message success';
+                    this.timeLeft += 10;
+                    this.init();
+                } else {
+                    this.score = Math.max(0, this.score - 10);
+                    document.getElementById('message').textContent = 'Incorrect. Try again!';
+                    document.getElementById('message').className = 'message error';
+                }
+
+                this.updateUI();
+            }
+
+            startTimer() {
+                setInterval(() => {
+                    if (!this.isPaused && this.gameActive) {
+                        this.timeLeft--;
+                        if (this.timeLeft <= 0) {
+                            this.endGame();
+                        }
+                        document.getElementById('time').textContent = this.timeLeft;
+                    }
+                }, 1000);
+            }
+
+            endGame() {
+                this.gameActive = false;
+                document.getElementById('message').textContent = `Game Over! Final Score: ${this.score}`;
+                document.getElementById('message').className = 'message success';
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+            }
+
+            draw() {
+                // Clear canvas
+                this.ctx.fillStyle = '#0a0e27';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Grid
+                this.ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+                this.ctx.lineWidth = 1;
+                for (let i = 0; i < this.canvas.width; i += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i, 0);
+                    this.ctx.lineTo(i, this.canvas.height);
+                    this.ctx.stroke();
+                }
+
+                // Draw inputs
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = 'bold 14px Arial';
+                for (let input of this.inputs) {
+                    this.ctx.fillStyle = input.value ? '#ffff00' : '#00ff00';
+                    this.ctx.beginPath();
+                    this.ctx.arc(input.x, input.y, 10, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.fillStyle = '#000';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText(input.label, input.x, input.y);
+                }
+
+                // Draw gates
+                for (let gate of this.gates) {
+                    gate.draw(this.ctx);
+                }
+
+                // Draw output
+                this.ctx.fillStyle = this.output.expectedValue ? '#ffff00' : '#00ff00';
+                this.ctx.beginPath();
+                this.ctx.arc(this.output.x, this.output.y, 12, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.fillStyle = '#000';
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText('?', this.output.x, this.output.y);
+
+                // Draw hint
+                if (this.isPaused) {
+                    this.ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 30px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2);
+                }
+            }
+
+            update() {
+                this.draw();
+                requestAnimationFrame(() => this.update());
+            }
+
+            reset() {
+                this.score = 0;
+                this.level = 1;
+                this.timeLeft = 60;
+                this.gameActive = true;
+                this.isPaused = false;
+                this.init();
+                this.updateUI();
+            }
+        }
+
+        const game = new LogicGateGame();
+        game.update();
+
+        // High score management
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('logicGateHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('logicGateHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

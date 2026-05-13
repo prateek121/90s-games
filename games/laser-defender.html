@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LASER DEFENDER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #0f872a;
+            background: linear-gradient(to bottom, #001a00, #003300);
+            display: block;
+            box-shadow: 0 0 20px rgba(15, 135, 42, 0.5);
+        }
+        .info {
+            color: #0f872a;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(15, 135, 42, 0.1);
+            border: 2px solid #0f872a;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #0f872a;
+            color: #fff;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(15, 135, 42, 0.1);
+            border: 2px solid #0f872a;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="600" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Wave</div>
+                <div class="stat-value" id="wave">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Enemies</div>
+                <div class="stat-value" id="enemies">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                ← → Move base<br/>
+                SPACE Fire laser<br/>
+                Defend the base!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 600,
+            height: 500,
+
+            base: { x: 300, y: 450, width: 40, height: 20, health: 100 },
+            lasers: [],
+            enemies: [],
+            explosions: [],
+
+            score: 0,
+            wave: 1,
+            waveProgress: 0,
+            gameRunning: false,
+            gameOver: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.spawnWave();
+                }
+            },
+
+            spawnWave() {
+                const enemyCount = 5 + this.wave * 2;
+                for (let i = 0; i < enemyCount; i++) {
+                    this.enemies.push({
+                        x: Math.random() * this.width,
+                        y: -20,
+                        width: 20,
+                        height: 20,
+                        vy: 1 + this.wave * 0.3,
+                        health: 1 + Math.floor(this.wave / 3),
+                        color: `hsl(${Math.random() * 60}, 100%, 50%)`
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Update enemies
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const enemy = this.enemies[i];
+                    enemy.y += enemy.vy;
+
+                    // Enemy reached base
+                    if (enemy.y > this.height) {
+                        this.enemies.splice(i, 1);
+                        this.base.health -= 10;
+                        if (this.base.health <= 0) {
+                            this.gameOver = true;
+                            this.gameRunning = false;
+                        }
+                    }
+                }
+
+                // Update lasers
+                for (let i = this.lasers.length - 1; i >= 0; i--) {
+                    const laser = this.lasers[i];
+                    laser.y -= laser.speed;
+
+                    if (laser.y < 0) {
+                        this.lasers.splice(i, 1);
+                        continue;
+                    }
+
+                    // Check enemy collisions
+                    for (let j = this.enemies.length - 1; j >= 0; j--) {
+                        const enemy = this.enemies[j];
+                        if (laser.x > enemy.x && laser.x < enemy.x + enemy.width &&
+                            laser.y > enemy.y && laser.y < enemy.y + enemy.height) {
+
+                            enemy.health--;
+                            this.lasers.splice(i, 1);
+
+                            if (enemy.health <= 0) {
+                                this.enemies.splice(j, 1);
+                                this.createExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+                                this.score += 100 * this.wave;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Update explosions
+                for (let i = this.explosions.length - 1; i >= 0; i--) {
+                    this.explosions[i].life--;
+                    if (this.explosions[i].life <= 0) {
+                        this.explosions.splice(i, 1);
+                    }
+                }
+
+                // Wave complete
+                if (this.enemies.length === 0 && this.gameRunning && this.lasers.length === 0) {
+                    this.wave++;
+                    this.base.health = Math.min(100, this.base.health + 20);
+                    this.spawnWave();
+                }
+            },
+
+            createExplosion(x, y) {
+                this.explosions.push({
+                    x: x,
+                    y: y,
+                    life: 15,
+                    radius: 20
+                });
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#001a00');
+                gradient.addColorStop(1, '#003300');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw base
+                const baseHealth = this.base.health / 100;
+                this.ctx.fillStyle = `hsl(120, 100%, ${50 * baseHealth}%)`;
+                this.ctx.fillRect(this.base.x - this.base.width / 2, this.base.y,
+                    this.base.width, this.base.height);
+
+                // Health bar
+                this.ctx.strokeStyle = '#0f872a';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.base.x - this.base.width / 2, this.base.y - 10,
+                    this.base.width, 5);
+
+                this.ctx.fillStyle = '#0f872a';
+                this.ctx.fillRect(this.base.x - this.base.width / 2, this.base.y - 10,
+                    this.base.width * baseHealth, 5);
+
+                // Draw lasers
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 2;
+                for (let laser of this.lasers) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(laser.x, laser.y);
+                    this.ctx.lineTo(laser.x, laser.y + 10);
+                    this.ctx.stroke();
+                }
+
+                // Draw enemies
+                for (let enemy of this.enemies) {
+                    this.ctx.fillStyle = enemy.color;
+                    this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+
+                    // Enemy health
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.strokeRect(enemy.x, enemy.y - 5, enemy.width, 2);
+
+                    const healthRatio = enemy.health / (1 + Math.floor(this.wave / 3));
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.fillRect(enemy.x, enemy.y - 5, enemy.width * healthRatio, 2);
+                }
+
+                // Draw explosions
+                for (let exp of this.explosions) {
+                    this.ctx.fillStyle = `rgba(255, 100, 0, ${exp.life / 15})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(exp.x, exp.y, exp.radius * (1 - exp.life / 15), 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#0f872a';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+                this.ctx.fillText(`Wave: ${this.wave}`, 10, 45);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#0f872a';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('BASE DESTROYED', this.width / 2, this.height / 2);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 40);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('wave').textContent = this.wave;
+                document.getElementById('enemies').textContent = this.enemies.length;
+            },
+
+            setupInput() {
+                const keys = {};
+
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key.toLowerCase()] = true;
+
+                    if (e.key === ' ') {
+                        if (this.gameRunning) {
+                            this.lasers.push({
+                                x: this.base.x,
+                                y: this.base.y - 10,
+                                speed: 8,
+                                width: 2,
+                                height: 10
+                            });
+                        } else if (!this.gameOver) {
+                            this.start();
+                        }
+                        e.preventDefault();
+                    }
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key.toLowerCase()] = false;
+                });
+
+                setInterval(() => {
+                    if (keys['arrowleft']) {
+                        this.base.x = Math.max(this.base.width / 2, this.base.x - 5);
+                    }
+                    if (keys['arrowright']) {
+                        this.base.x = Math.min(this.width - this.base.width / 2, this.base.x + 5);
+                    }
+                }, 20);
+            },
+
+            restart() {
+                this.base = { x: 300, y: 450, width: 40, height: 20, health: 100 };
+                this.lasers = [];
+                this.enemies = [];
+                this.explosions = [];
+                this.score = 0;
+                this.wave = 1;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

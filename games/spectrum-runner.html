@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPECTRUM RUNNER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #0f0a20 0%, #1a0f3f 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff006e;
+            background: #000;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(255, 0, 110, 0.5);
+        }
+        .info {
+            color: #ff006e;
+            margin-top: 20px;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(255, 0, 110, 0.5);
+        }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00d9ff;
+            text-shadow: 0 0 10px rgba(0, 217, 255, 0.8);
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #ff006e;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ff006e;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(255, 0, 110, 0.5);
+        }
+        button:hover {
+            background: #00d9ff;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #ff006e; text-shadow: 0 0 20px rgba(255, 0, 110, 0.8);">🌈 SPECTRUM RUNNER 🌈</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>SPACE or UP to jump</p>
+                <p>Jump over obstacles!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            player: { x: 175, y: 480, width: 30, height: 40, vy: 0, gravity: 0.6, onGround: false },
+            obstacles: [],
+            particles: [],
+            collectibles: [],
+            score: 0,
+            collected: 0,
+            level: 1,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            groundLevel: 520,
+            highScore: localStorage.getItem('spectrumRunnerHigh') || 0,
+            speed: 5,
+            colorIndex: 0,
+            colors: ['#ff006e', '#00d9ff', '#00ff88', '#ffaa00', '#ff0080', '#00ddff'],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 480, width: 30, height: 40, vy: 0, gravity: 0.6, onGround: false };
+                this.obstacles = [];
+                this.particles = [];
+                this.collectibles = [];
+                this.score = 0;
+                this.collected = 0;
+                this.level = 1;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.speed = 5;
+                this.colorIndex = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.frameCount++;
+                this.speed = 5 + this.score / 50;
+
+                // Level progression
+                const newLevel = Math.floor(this.collected / 3) + 1;
+                if (newLevel > this.level) {
+                    this.level = newLevel;
+                }
+
+                // Player physics
+                this.player.vy += this.player.gravity;
+                this.player.y += this.player.vy;
+
+                // Ground collision
+                if (this.player.y + this.player.height >= this.groundLevel) {
+                    this.player.y = this.groundLevel - this.player.height;
+                    this.player.vy = 0;
+                    this.player.onGround = true;
+                } else {
+                    this.player.onGround = false;
+                }
+
+                // Color cycling
+                this.colorIndex = (this.colorIndex + 0.01) % this.colors.length;
+
+                // Generate obstacles
+                const spawnRate = Math.max(30, 50 - this.level * 2);
+                if (this.frameCount % spawnRate === 0) {
+                    this.spawnObstacle();
+                }
+
+                // Spawn collectibles occasionally
+                if (this.frameCount % 120 === 0) {
+                    this.spawnCollectible();
+                }
+
+                // Update obstacles
+                for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                    const obs = this.obstacles[i];
+                    obs.x -= this.speed;
+
+                    // Collision check
+                    if (this.collides(this.player, obs)) {
+                        this.createExplosion(this.player.x + 15, this.player.y + 20);
+                        this.endGame();
+                        return;
+                    }
+
+                    // Scoring
+                    if (obs.x + obs.width < this.player.x && !obs.scored) {
+                        obs.scored = true;
+                        this.score += 10;
+                    }
+
+                    // Remove off-screen obstacles
+                    if (obs.x < -50) {
+                        this.obstacles.splice(i, 1);
+                    }
+                }
+
+                // Update collectibles
+                for (let i = this.collectibles.length - 1; i >= 0; i--) {
+                    const item = this.collectibles[i];
+                    item.x -= this.speed;
+                    item.y += Math.sin(this.frameCount * 0.05 + i) * 0.5;
+
+                    // Collision check
+                    if (this.collides(this.player, item)) {
+                        this.score += 25;
+                        this.collected++;
+                        this.createParticles(item.x, item.y);
+                        this.collectibles.splice(i, 1);
+                        continue;
+                    }
+
+                    if (item.x < -20) {
+                        this.collectibles.splice(i, 1);
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            },
+
+            spawnCollectible() {
+                this.collectibles.push({
+                    x: this.width,
+                    y: this.groundLevel - 60 + Math.random() * 40,
+                    width: 15,
+                    height: 15
+                });
+            },
+
+            createParticles(x, y) {
+                for (let i = 0; i < 5; i++) {
+                    const angle = (Math.PI * 2 * i) / 5;
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        life: 20
+                    });
+                }
+            },
+
+            createExplosion(x, y) {
+                for (let i = 0; i < 8; i++) {
+                    const angle = (Math.PI * 2 * i) / 8;
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3,
+                        life: 25
+                    });
+                }
+            },
+
+            spawnObstacle() {
+                const height = 20 + Math.random() * 40;
+                const width = 30 + Math.random() * 30;
+                this.obstacles.push({
+                    x: this.width,
+                    y: this.groundLevel - height,
+                    width: width,
+                    height: height,
+                    color: this.colors[Math.floor(Math.random() * this.colors.length)]
+                });
+            },
+
+            collides(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            jump() {
+                if (this.gameRunning && !this.gamePaused && this.player.onGround) {
+                    this.player.vy = -15;
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('spectrumRunnerHigh', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw spectrum gradient background
+                const gradient = this.ctx.createLinearGradient(0, 0, this.width, 0);
+                const hue = Math.floor(this.frameCount * 0.5) % 360;
+                gradient.addColorStop(0, `hsl(${hue}, 100%, 50%)`);
+                gradient.addColorStop(1, `hsl(${(hue + 180) % 360}, 100%, 50%)`);
+
+                // Draw ground
+                this.ctx.fillStyle = '#333333';
+                this.ctx.fillRect(0, this.groundLevel, this.width, this.height - this.groundLevel);
+
+                // Draw checkered pattern on ground
+                this.ctx.fillStyle = '#444444';
+                for (let i = 0; i < this.width; i += 20) {
+                    for (let j = 0; j < this.height - this.groundLevel; j += 20) {
+                        if (((i / 20) + (j / 20)) % 2 === 0) {
+                            this.ctx.fillRect(i, this.groundLevel + j, 20, 20);
+                        }
+                    }
+                }
+
+                // Draw obstacles
+                for (let obs of this.obstacles) {
+                    this.ctx.shadowColor = obs.color;
+                    this.ctx.shadowBlur = 15;
+                    this.ctx.fillStyle = obs.color;
+                    this.ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                    this.ctx.shadowBlur = 0;
+                }
+
+                // Draw collectibles
+                this.ctx.shadowColor = '#ffff00';
+                this.ctx.shadowBlur = 10;
+                this.ctx.fillStyle = '#ffff00';
+                for (let item of this.collectibles) {
+                    this.ctx.fillRect(item.x, item.y, item.width, item.height);
+                }
+                this.ctx.shadowBlur = 0;
+
+                // Draw particles
+                this.ctx.fillStyle = '#00ffff';
+                for (let p of this.particles) {
+                    this.ctx.fillRect(p.x, p.y, 3, 3);
+                }
+
+                // Draw player with cycling colors
+                const colorIdx = Math.floor(this.colorIndex);
+                const color = this.colors[colorIdx];
+                this.ctx.shadowColor = color;
+                this.ctx.shadowBlur = 20;
+                this.ctx.fillStyle = color;
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+
+                // Eyes
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(this.player.x + 8, this.player.y + 10, 5, 5);
+                this.ctx.fillRect(this.player.x + 17, this.player.y + 10, 5, 5);
+                this.ctx.shadowBlur = 0;
+
+                // Score display
+                this.ctx.fillStyle = '#00d9ff';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 30);
+                this.ctx.fillText(`Level: ${this.level}`, 10, 50);
+                this.ctx.fillText(`Collected: ${this.collected}`, 10, 70);
+                this.ctx.fillText(`Speed: ${Math.floor(this.speed * 10) / 10}x`, 10, 90);
+                this.ctx.fillText(`Best: ${this.highScore}`, 10, 110);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff006e';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff006e';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 50);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2);
+                    this.ctx.fillText(`Level Reached: ${this.level}`, this.width / 2, this.height / 2 + 25);
+                    this.ctx.fillText(`Items Collected: ${this.collected}`, this.width / 2, this.height / 2 + 50);
+                    this.ctx.fillText(`Best Score: ${this.highScore}`, this.width / 2, this.height / 2 + 75);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                        this.jump();
+                        e.preventDefault();
+                    }
+                });
+
+                document.addEventListener('touchstart', () => {
+                    this.jump();
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

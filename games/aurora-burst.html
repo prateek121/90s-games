@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURORA BURST - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0d1b2a, #1b263b);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        canvas#gameCanvas {
+            border: 4px solid #00ffcc;
+            background: linear-gradient(135deg, #0d1b2a, #1b263b);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.4);
+        }
+        .info {
+            color: #00ffcc;
+            margin-top: 20px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ffcc;
+            text-shadow: 0 0 15px #00ffcc;
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #0099aa;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ffcc;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        button:hover { background: #33ffdd; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ AURORA BURST ✨</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>CLICK to emit particles | ARROW KEYS to move emitter</p>
+                <p>Create particle collisions for maximum combos!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            emitter: { x: 200, y: 300, width: 30, height: 30, speed: 5 },
+            particles: [],
+            collisions: [],
+            score: 0,
+            combo: 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            keys: {},
+            colors: ['#ff00ff', '#00ffff', '#ffff00', '#ff0080', '#00ff80'],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.emitter = { x: 200, y: 300, width: 30, height: 30, speed: 5 };
+                this.particles = [];
+                this.collisions = [];
+                this.score = 0;
+                this.combo = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+            },
+
+            emitParticles() {
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    this.particles.push({
+                        x: this.emitter.x + this.emitter.width / 2,
+                        y: this.emitter.y + this.emitter.height / 2,
+                        vx: Math.cos(angle) * 4,
+                        vy: Math.sin(angle) * 4,
+                        life: 150,
+                        maxLife: 150,
+                        color: this.colors[Math.floor(Math.random() * this.colors.length)],
+                        size: Math.random() * 3 + 2
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Emitter movement
+                if (this.keys['ArrowLeft'] && this.emitter.x > 0) {
+                    this.emitter.x -= this.emitter.speed;
+                }
+                if (this.keys['ArrowRight'] && this.emitter.x < this.width - this.emitter.width) {
+                    this.emitter.x += this.emitter.speed;
+                }
+                if (this.keys['ArrowUp'] && this.emitter.y > 0) {
+                    this.emitter.y -= this.emitter.speed;
+                }
+                if (this.keys['ArrowDown'] && this.emitter.y < this.height - this.emitter.height) {
+                    this.emitter.y += this.emitter.speed;
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    p.vy += 0.2; // Gravity
+
+                    if (p.life <= 0 || p.y > this.height || p.x < 0 || p.x > this.width) {
+                        this.particles.splice(i, 1);
+                        continue;
+                    }
+
+                    // Check collisions with other particles
+                    for (let j = i + 1; j < this.particles.length; j++) {
+                        const other = this.particles[j];
+                        const dx = other.x - p.x;
+                        const dy = other.y - p.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < p.size + other.size) {
+                            this.collisions.push({
+                                x: (p.x + other.x) / 2,
+                                y: (p.y + other.y) / 2,
+                                life: 30,
+                                size: p.size + other.size
+                            });
+
+                            this.score += 5 * (this.combo + 1);
+                            this.combo++;
+
+                            // Remove particles
+                            this.particles.splice(j, 1);
+                            this.particles.splice(i, 1);
+                            i--;
+                            break;
+                        }
+                    }
+                }
+
+                // Update collisions
+                for (let i = this.collisions.length - 1; i >= 0; i--) {
+                    const c = this.collisions[i];
+                    c.life--;
+                    if (c.life <= 0) {
+                        this.collisions.splice(i, 1);
+                    }
+                }
+
+                // Reduce combo over time
+                if (this.frameCount % 30 === 0) {
+                    this.combo = Math.max(0, this.combo - 1);
+                }
+
+                this.frameCount++;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0d1b2a');
+                gradient.addColorStop(1, '#1b263b');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw stars
+                for (let i = 0; i < 50; i++) {
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    const x = (i * 80 + Math.sin(this.frameCount / 100 + i) * 20) % this.width;
+                    const y = (i * 60 + Math.cos(this.frameCount / 100 + i) * 20) % this.height;
+                    this.ctx.fillRect(x, y, 1, 1);
+                }
+
+                // Draw emitter
+                this.ctx.fillStyle = '#00ffcc';
+                this.ctx.fillRect(this.emitter.x, this.emitter.y, this.emitter.width, this.emitter.height);
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.emitter.x, this.emitter.y, this.emitter.width, this.emitter.height);
+
+                // Inner circle
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.emitter.x + this.emitter.width / 2, this.emitter.y + this.emitter.height / 2, 5, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Draw particles
+                for (let p of this.particles) {
+                    const opacity = p.life / p.maxLife;
+                    this.ctx.fillStyle = p.color.replace(')', `, ${opacity})`).replace('rgb', 'rgba');
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    this.ctx.strokeStyle = p.color;
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                }
+
+                // Draw collision effects
+                for (let c of this.collisions) {
+                    const opacity = c.life / 30;
+                    this.ctx.fillStyle = `rgba(255, 255, 0, ${opacity * 0.8})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(c.x, c.y, c.size * 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    this.ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ffcc';
+                this.ctx.font = 'bold 18px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 30);
+                this.ctx.fillText(`Combo: ${this.combo}x`, 10, 60);
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.fillText(`Particles: ${this.particles.length}`, 10, 85);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffcc';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+                this.canvas.addEventListener('click', () => {
+                    this.emitParticles();
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

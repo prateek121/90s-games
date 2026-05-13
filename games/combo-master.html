@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combo Master - Action Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a3a5a 0%, #3a2a5a 100%);
+            font-family: 'Arial', sans-serif;
+            color: #00ff00;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 15px #00ff00;
+            border: 3px solid #00ff00;
+            padding: 15px 30px;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            font-size: 1.2em;
+        }
+
+        .stat {
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        .stat span {
+            color: #ffff00;
+            font-weight: bold;
+        }
+
+        #canvas {
+            border: 4px solid #00ff00;
+            background: #000;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.4);
+        }
+
+        .combo-display {
+            text-align: center;
+            font-size: 2em;
+            color: #ffff00;
+            text-shadow: 0 0 15px #ffff00;
+            min-height: 40px;
+        }
+
+        .message {
+            min-height: 25px;
+            font-size: 1.3em;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff4444;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #00ff00, #00aa00);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .instruction {
+            text-align: center;
+            color: #00ff00;
+            font-size: 0.95em;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>COMBO MASTER</h1>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Max Combo: <span id="maxCombo">0</span></div>
+            <div class="stat">Time: <span id="time">45</span>s</div>
+        </div>
+        <div class="instruction">Press keys matching the color sequences!</div>
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="combo-display" id="comboDisplay"></div>
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        class ComboButton {
+            constructor(x, y, key, color) {
+                this.x = x;
+                this.y = y;
+                this.key = key;
+                this.color = color;
+                this.width = 120;
+                this.height = 100;
+                this.isPressed = false;
+                this.pressAlpha = 0;
+            }
+
+            contains(x, y) {
+                return x > this.x && x < this.x + this.width &&
+                       y > this.y && y < this.y + this.height;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.isPressed ? 1 : 0.6;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.globalAlpha = 1;
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.key.toUpperCase(), this.x + this.width / 2, this.y + this.height / 2);
+
+                if (this.pressAlpha > 0) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.globalAlpha = this.pressAlpha;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                    ctx.globalAlpha = 1;
+                    this.pressAlpha *= 0.95;
+                }
+            }
+
+            press() {
+                this.isPressed = true;
+                this.pressAlpha = 1;
+            }
+
+            release() {
+                this.isPressed = false;
+            }
+        }
+
+        class ComboMaster {
+            constructor() {
+                this.score = 0;
+                this.combo = 0;
+                this.maxCombo = 0;
+                this.timeLeft = 45;
+                this.gameActive = true;
+                this.sequence = [];
+                this.userInput = [];
+                this.sequenceSpeed = 1;
+
+                this.buttons = [
+                    new ComboButton(50, 100, 'q', '#ff0000'),
+                    new ComboButton(200, 100, 'w', '#00ff00'),
+                    new ComboButton(350, 100, 'e', '#0088ff'),
+                    new ComboButton(500, 100, 'r', '#ffff00'),
+                    new ComboButton(650, 100, 'u', '#ff00ff')
+                ];
+
+                this.keyMap = {};
+                this.buttons.forEach(btn => {
+                    this.keyMap[btn.key] = btn;
+                });
+
+                this.init();
+                this.startTimer();
+                this.setupEventListeners();
+            }
+
+            init() {
+                this.sequence = [];
+                this.generateSequence();
+            }
+
+            generateSequence() {
+                const keyList = Object.keys(this.keyMap);
+                const newKey = keyList[Math.floor(Math.random() * keyList.length)];
+                this.sequence.push(newKey);
+                this.userInput = [];
+            }
+
+            setupEventListeners() {
+                window.addEventListener('keydown', (e) => {
+                    if (!this.gameActive) return;
+                    const key = e.key.toLowerCase();
+                    if (this.keyMap[key]) {
+                        this.handleKeyPress(key);
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    const key = e.key.toLowerCase();
+                    if (this.keyMap[key]) {
+                        this.keyMap[key].release();
+                    }
+                });
+            }
+
+            handleKeyPress(key) {
+                const button = this.keyMap[key];
+                button.press();
+
+                this.userInput.push(key);
+
+                if (key === this.sequence[this.userInput.length - 1]) {
+                    if (this.userInput.length === this.sequence.length) {
+                        this.comboSuccess();
+                    }
+                } else {
+                    this.comboFail();
+                }
+            }
+
+            comboSuccess() {
+                this.combo++;
+                this.maxCombo = Math.max(this.maxCombo, this.combo);
+                const points = 50 * this.combo;
+                this.score += points;
+
+                document.getElementById('message').textContent = `Correct! +${points}`;
+                document.getElementById('message').className = 'message success';
+
+                setTimeout(() => {
+                    this.generateSequence();
+                }, 500);
+            }
+
+            comboFail() {
+                document.getElementById('message').textContent = `Wrong! Combo broken`;
+                document.getElementById('message').className = 'message error';
+                this.combo = 0;
+                this.init();
+            }
+
+            startTimer() {
+                setInterval(() => {
+                    if (this.gameActive) {
+                        this.timeLeft--;
+                        document.getElementById('time').textContent = this.timeLeft;
+
+                        if (this.timeLeft <= 0) {
+                            this.endGame();
+                        }
+                    }
+                }, 1000);
+            }
+
+            endGame() {
+                this.gameActive = false;
+                document.getElementById('message').textContent = `Game Over! Score: ${this.score}`;
+                document.getElementById('message').className = 'message success';
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('maxCombo').textContent = this.maxCombo;
+                document.getElementById('comboDisplay').textContent =
+                    this.combo > 0 ? `COMBO: ${this.combo}` : '';
+            }
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Background
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw buttons
+                this.buttons.forEach(btn => btn.draw(ctx));
+
+                // Draw sequence display
+                ctx.fillStyle = '#00ff00';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText('Sequence:', 50, 300);
+
+                let seqText = this.sequence.map(k => k.toUpperCase()).join(' ');
+                ctx.fillStyle = '#ffff00';
+                ctx.fillText(seqText, 200, 300);
+
+                ctx.fillStyle = '#00ff00';
+                ctx.fillText('Your input:', 50, 350);
+
+                let inputText = this.userInput.map(k => k.toUpperCase()).join(' ');
+                ctx.fillStyle = inputText === seqText.replace(/ /g, '') ? '#00ff00' : '#ff4444';
+                ctx.fillText(inputText, 200, 350);
+
+                this.updateUI();
+            }
+
+            update() {
+                this.draw();
+                requestAnimationFrame(() => this.update());
+            }
+
+            reset() {
+                this.score = 0;
+                this.combo = 0;
+                this.maxCombo = 0;
+                this.timeLeft = 45;
+                this.gameActive = true;
+                document.getElementById('message').textContent = '';
+                this.init();
+            }
+        }
+
+        const game = new ComboMaster();
+        game.update();
+
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('comboMasterHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('comboMasterHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

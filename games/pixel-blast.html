@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIXEL BLAST - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #2d1b69 0%, #1a1a2e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff00ff;
+            background: #0a0a0a;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+        }
+        .info {
+            color: #ff00ff;
+            margin-top: 20px;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 0 0 10px rgba(255, 255, 0, 0.8);
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #ff00ff;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ff00ff;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+        button:hover {
+            background: #ffff00;
+            box-shadow: 0 0 20px rgba(255, 255, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #ff00ff; text-shadow: 0 0 20px rgba(255, 0, 255, 0.8);">💥 PIXEL BLAST 💥</h1>
+        <canvas id="gameCanvas" width="450" height="500"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>MOUSE to aim and shoot</p>
+                <p>Destroy all enemies!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 450,
+            height: 500,
+
+            player: { x: 225, y: 460, width: 30, height: 30 },
+            enemies: [],
+            bullets: [],
+            explosions: [],
+            particles: [],
+            mouseX: 225,
+            mouseY: 460,
+            score: 0,
+            wave: 1,
+            enemiesKilled: 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            shotsFired: 0,
+            accuracy: 0,
+            highScore: localStorage.getItem('pixelBlastHigh') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 225, y: 460, width: 30, height: 30 };
+                this.enemies = [];
+                this.bullets = [];
+                this.explosions = [];
+                this.particles = [];
+                this.score = 0;
+                this.wave = 1;
+                this.enemiesKilled = 0;
+                this.shotsFired = 0;
+                this.accuracy = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.frameCount++;
+
+                // Spawn enemies
+                if (this.frameCount % 50 === 0) {
+                    this.spawnEnemy();
+                }
+
+                // Update bullets
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    const bullet = this.bullets[i];
+                    bullet.x += bullet.vx;
+                    bullet.y += bullet.vy;
+
+                    let hit = false;
+                    for (let j = this.enemies.length - 1; j >= 0; j--) {
+                        const enemy = this.enemies[j];
+                        if (this.collides(bullet, enemy)) {
+                            this.createExplosion(enemy.x, enemy.y);
+                            this.enemies.splice(j, 1);
+                            hit = true;
+                            this.score += 10;
+                            this.enemiesKilled++;
+                            break;
+                        }
+                    }
+
+                    if (hit || bullet.x < 0 || bullet.x > this.width || bullet.y < 0 || bullet.y > this.height) {
+                        this.bullets.splice(i, 1);
+                    }
+                }
+
+                // Update explosions
+                for (let i = this.explosions.length - 1; i >= 0; i--) {
+                    const exp = this.explosions[i];
+                    exp.radius = (exp.maxRadius * (1 - exp.life / 15));
+                    exp.life--;
+                    if (exp.life <= 0) {
+                        this.explosions.splice(i, 1);
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                // Update enemies
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const enemy = this.enemies[i];
+                    const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
+                    enemy.x += Math.cos(angle) * (1.5 + this.wave * 0.3);
+                    enemy.y += Math.sin(angle) * (1.5 + this.wave * 0.3);
+
+                    // Collision with player
+                    if (this.collides(this.player, enemy)) {
+                        this.createExplosion(this.player.x, this.player.y);
+                        this.endGame();
+                        return;
+                    }
+
+                    // Out of bounds
+                    if (enemy.x < -30 || enemy.x > this.width + 30 || enemy.y < -30 || enemy.y > this.height + 30) {
+                        this.enemies.splice(i, 1);
+                    }
+                }
+
+                // Wave progression
+                if (this.enemies.length === 0 && this.frameCount % 60 === 0) {
+                    this.wave++;
+                    for (let i = 0; i < 2 + this.wave; i++) {
+                        this.spawnEnemy();
+                    }
+                }
+            },
+
+            spawnEnemy() {
+                const side = Math.floor(Math.random() * 4);
+                let x, y;
+                if (side === 0) { x = Math.random() * this.width; y = -20; }
+                else if (side === 1) { x = this.width + 20; y = Math.random() * this.height; }
+                else if (side === 2) { x = Math.random() * this.width; y = this.height + 20; }
+                else { x = -20; y = Math.random() * this.height; }
+
+                this.enemies.push({ x: x, y: y, width: 20, height: 20 });
+            },
+
+            collides(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            shoot() {
+                if (!this.gameRunning || this.gamePaused) return;
+                const dx = this.mouseX - this.player.x;
+                const dy = this.mouseY - this.player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                this.bullets.push({
+                    x: this.player.x + 15,
+                    y: this.player.y + 15,
+                    width: 6,
+                    height: 6,
+                    vx: (dx / dist) * 6,
+                    vy: (dy / dist) * 6
+                });
+                this.shotsFired++;
+            },
+
+            createExplosion(x, y) {
+                this.explosions.push({ x: x, y: y, radius: 0, maxRadius: 30, life: 15 });
+                for (let i = 0; i < 8; i++) {
+                    const angle = (Math.PI * 2 * i) / 8;
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * 3,
+                        vy: Math.sin(angle) * 3,
+                        life: 20
+                    });
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('pixelBlastHigh', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#0a0a0a';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw player with glow
+                this.ctx.shadowColor = '#ffff00';
+                this.ctx.shadowBlur = 15;
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.shadowBlur = 0;
+
+                // Draw bullets
+                this.ctx.fillStyle = '#00ffff';
+                for (let bullet of this.bullets) {
+                    this.ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                }
+
+                // Draw explosions
+                this.ctx.fillStyle = '#ffaa00';
+                for (let exp of this.explosions) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Draw enemies with glow
+                this.ctx.shadowColor = '#ff0000';
+                this.ctx.shadowBlur = 10;
+                this.ctx.fillStyle = '#ff0000';
+                for (let enemy of this.enemies) {
+                    this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                }
+                this.ctx.shadowBlur = 0;
+
+                // Draw particles
+                this.ctx.fillStyle = '#ffff00';
+                for (let p of this.particles) {
+                    this.ctx.fillRect(p.x, p.y, 3, 3);
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+                this.ctx.fillText(`Wave: ${this.wave}`, 10, 45);
+                this.ctx.fillText(`Enemies: ${this.enemies.length}`, 10, 65);
+                this.ctx.fillText(`Kills: ${this.enemiesKilled}`, 10, 85);
+                this.ctx.fillText(`Shots: ${this.shotsFired}`, 10, 105);
+                this.ctx.fillText(`Best: ${this.highScore}`, 10, 125);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff00ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 50);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2);
+                    this.ctx.fillText(`Wave Reached: ${this.wave}`, this.width / 2, this.height / 2 + 25);
+                    this.ctx.fillText(`Enemies Killed: ${this.enemiesKilled}`, this.width / 2, this.height / 2 + 50);
+                    this.ctx.fillText(`Best Score: ${this.highScore}`, this.width / 2, this.height / 2 + 75);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = e.clientX - rect.left;
+                    this.mouseY = e.clientY - rect.top;
+                });
+
+                document.addEventListener('click', () => this.shoot());
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ') {
+                        this.shoot();
+                        e.preventDefault();
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

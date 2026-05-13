@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binary Blast - 90s Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a0033, #2d0052);
+            font-family: 'Courier New', monospace;
+            color: #FF00FF;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            text-shadow: 0 0 10px #FF00FF;
+            letter-spacing: 2px;
+        }
+
+        #gameCanvas {
+            border: 2px solid #FF00FF;
+            background: #000;
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            text-shadow: 0 0 5px #FF00FF;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: rgba(255, 0, 255, 0.1);
+            padding: 8px 15px;
+            border: 1px solid #FF00FF;
+            border-radius: 3px;
+            margin: 3px;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 0, 255, 0.1);
+            border: 1px solid #FF00FF;
+            border-radius: 3px;
+        }
+
+        button {
+            background: rgba(255, 0, 255, 0.1);
+            color: #FF00FF;
+            border: 1px solid #FF00FF;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            text-shadow: 0 0 5px #FF00FF;
+        }
+
+        button:hover {
+            background: rgba(255, 0, 255, 0.2);
+            box-shadow: 0 0 10px #FF00FF;
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border: 2px solid #FF00FF;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+            border-radius: 3px;
+        }
+
+        .game-over h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #FF00FF;
+        }
+
+        .game-over p {
+            font-size: 1em;
+            margin: 10px 0;
+            text-shadow: 0 0 5px #FF00FF;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>>> BINARY_BLAST.EXE</h1>
+        <div class="stats">
+            <div class="stat">MATCHED: <span id="matched">0</span></div>
+            <div class="stat">SCORE: <span id="score">0</span></div>
+            <div class="stat">STREAK: <span id="streak">0</span></div>
+            <div class="stat">LEVEL: <span id="level">1</span></div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            <button onclick="togglePause()">PAUSE</button>
+            <button onclick="restartGame()">RESTART</button>
+            <button onclick="goHome()">EXIT</button>
+        </div>
+        <p style="margin-top: 15px; font-size: 0.85em;">Match pairs of binary numbers | Click on bits</p>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h2>> SYSTEM_OVERFLOW</h2>
+        <p>PAIRS_MATCHED: <span id="finalMatched">0</span></p>
+        <p>FINAL_SCORE: <span id="finalScore">0</span></p>
+        <p>BEST_STREAK: <span id="finalStreak">0</span></p>
+        <button onclick="restartGame()" style="margin-top: 20px;">RESTART</button>
+        <button onclick="goHome()" style="margin-top: 20px;">EXIT</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            matched: 0,
+            score: 0,
+            streak: 0,
+            maxStreak: 0,
+            level: 1,
+            isPaused: false,
+            gameOver: false,
+            time: 0
+        };
+
+        class Bit {
+            constructor(x, y, value) {
+                this.x = x;
+                this.y = y;
+                this.value = value;
+                this.size = 30;
+                this.selected = false;
+                this.matched = false;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.wobble = 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.wobble * 0.02);
+
+                if (this.matched) {
+                    ctx.globalAlpha = 0.3;
+                }
+
+                ctx.fillStyle = this.selected ? '#00FF00' : '#FF00FF';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 20px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.value, 0, 0);
+
+                ctx.restore();
+            }
+
+            isClicked(x, y) {
+                const dx = this.x - x;
+                const dy = this.y - y;
+                return Math.sqrt(dx * dx + dy * dy) < this.size;
+            }
+        }
+
+        let bits = [];
+        let selected = [];
+
+        function initGame() {
+            bits = [];
+            selected = [];
+            game.matched = 0;
+            game.score = 0;
+            game.streak = 0;
+            game.maxStreak = 0;
+            game.level = 1;
+            game.isPaused = false;
+            game.gameOver = false;
+            game.time = 0;
+
+            createLevel();
+        }
+
+        function createLevel() {
+            bits = [];
+            selected = [];
+
+            const gridSize = 3 + Math.floor(game.level / 2);
+            const startX = (canvas.width - (gridSize * 80)) / 2 + 40;
+            const startY = (canvas.height - (gridSize * 80)) / 2 + 40;
+
+            const values = [];
+            for (let i = 0; i < gridSize * gridSize / 2; i++) {
+                const binary = Math.floor(Math.random() * 256).toString(2).padStart(8, '0');
+                values.push(binary, binary);
+            }
+
+            values.sort(() => Math.random() - 0.5);
+
+            let idx = 0;
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    const bit = new Bit(
+                        startX + x * 80,
+                        startY + y * 80,
+                        values[idx++]
+                    );
+                    bits.push(bit);
+                }
+            }
+        }
+
+        function update() {
+            if (game.gameOver || game.isPaused) return;
+
+            game.time++;
+
+            bits.forEach(bit => {
+                bit.wobble++;
+            });
+
+            const unmatched = bits.filter(b => !b.matched);
+            if (unmatched.length === 0) {
+                game.level++;
+                createLevel();
+            }
+
+            updateUI();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(255, 0, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+
+            bits.forEach(bit => bit.draw());
+
+            ctx.fillStyle = '#FF00FF';
+            ctx.font = 'bold 11px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText('>> BINARY_MATCHING_ACTIVE', 10, 25);
+        }
+
+        function updateUI() {
+            document.getElementById('matched').textContent = game.matched;
+            document.getElementById('score').textContent = game.score;
+            document.getElementById('streak').textContent = game.streak;
+            document.getElementById('level').textContent = game.level;
+        }
+
+        function endGame() {
+            game.gameOver = true;
+            document.getElementById('finalMatched').textContent = game.matched;
+            document.getElementById('finalScore').textContent = game.score;
+            document.getElementById('finalStreak').textContent = game.maxStreak;
+            document.getElementById('gameOverScreen').style.display = 'block';
+            saveScore();
+        }
+
+        function togglePause() {
+            game.isPaused = !game.isPaused;
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            initGame();
+        }
+
+        function goHome() {
+            window.location.href = '/90s-games/';
+        }
+
+        function saveScore() {
+            let scores = JSON.parse(localStorage.getItem('binaryBlastScores') || '[]');
+            scores.push({
+                score: game.score,
+                matched: game.matched,
+                streak: game.maxStreak,
+                level: game.level,
+                date: new Date().toISOString()
+            });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('binaryBlastScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (!game.gameOver && !game.isPaused) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                let clickedBit = null;
+                for (let bit of bits) {
+                    if (bit.isClicked(x, y) && !bit.matched) {
+                        clickedBit = bit;
+                        break;
+                    }
+                }
+
+                if (clickedBit) {
+                    if (selected.includes(clickedBit)) {
+                        clickedBit.selected = false;
+                        selected = selected.filter(b => b !== clickedBit);
+                    } else if (selected.length < 2) {
+                        clickedBit.selected = true;
+                        selected.push(clickedBit);
+
+                        if (selected.length === 2) {
+                            if (selected[0].value === selected[1].value) {
+                                selected[0].matched = true;
+                                selected[1].matched = true;
+                                game.matched++;
+                                game.streak++;
+                                game.maxStreak = Math.max(game.maxStreak, game.streak);
+                                game.score += 100 * game.streak;
+                                selected = [];
+                            } else {
+                                game.streak = 0;
+                                setTimeout(() => {
+                                    selected.forEach(b => b.selected = false);
+                                    selected = [];
+                                }, 500);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

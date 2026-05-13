@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nature Collector - 90s Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #228B22, #32CD32);
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #90EE90 0%, #3CB371 100%);
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            cursor: grab;
+        }
+
+        #gameCanvas:active {
+            cursor: grabbing;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: 2px solid #fff;
+            margin: 5px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            border: 2px solid #fff;
+        }
+
+        button {
+            background: #32CD32;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00FF00;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .inventory {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            border: 3px solid #32CD32;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .game-over h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #32CD32;
+        }
+
+        .game-over p {
+            font-size: 1.2em;
+            margin: 10px 0;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌿 Nature Collector 🌿</h1>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Items: <span id="items">0</span></div>
+            <div class="stat">Time: <span id="time">60</span>s</div>
+            <div class="stat">Combo: <span id="combo">0</span>x</div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            <button onclick="togglePause()">Pause</button>
+            <button onclick="restartGame()">Restart</button>
+            <button onclick="goHome()">Home</button>
+        </div>
+        <div class="inventory">
+            Collected: <span id="collected">-</span>
+        </div>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p>Items Collected: <span id="finalItems">0</span></p>
+        <p>Best Combo: <span id="finalCombo">0</span>x</p>
+        <p id="collectedList" style="margin-top: 15px; text-align: left;"></p>
+        <button onclick="restartGame()" style="margin-top: 20px;">Play Again</button>
+        <button onclick="goHome()" style="margin-top: 20px;">Home</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            score: 0,
+            itemsCollected: 0,
+            timeRemaining: 60,
+            combo: 0,
+            maxCombo: 0,
+            isPaused: false,
+            gameOver: false,
+            collectedTypes: {}
+        };
+
+        class Item {
+            constructor() {
+                this.types = ['flower', 'mushroom', 'leaf', 'berry', 'pinecone', 'butterfly', 'acorn', 'shell'];
+                this.type = this.types[Math.floor(Math.random() * this.types.length)];
+                this.x = Math.random() * (canvas.width - 40) + 20;
+                this.y = Math.random() * (canvas.height - 40) + 20;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2 - 0.5;
+                this.size = 15;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.wobble = Math.random() * Math.PI * 2;
+                this.collected = false;
+                this.life = 300;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.15;
+                this.rotation += 0.02;
+                this.wobble += 0.05;
+                this.life--;
+
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -0.8;
+                if (this.y < 0) this.vy *= -0.8;
+                if (this.y > canvas.height) {
+                    this.y = canvas.height;
+                    this.vy *= -0.6;
+                }
+
+                this.x = Math.max(0, Math.min(canvas.width, this.x));
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y + Math.sin(this.wobble) * 3);
+                ctx.rotate(this.rotation);
+                ctx.globalAlpha = Math.min(1, this.life / 300);
+
+                const colors = {
+                    flower: '#FF1493',
+                    mushroom: '#FF6347',
+                    leaf: '#228B22',
+                    berry: '#8B008B',
+                    pinecone: '#8B4513',
+                    butterfly: '#FFD700',
+                    acorn: '#CD853F',
+                    shell: '#F0E68C'
+                };
+
+                ctx.fillStyle = colors[this.type];
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            isCollected(px, py) {
+                const dx = this.x - px;
+                const dy = this.y - py;
+                return Math.sqrt(dx * dx + dy * dy) < this.size + 15;
+            }
+
+            isActive() {
+                return this.life > 0 && !this.collected;
+            }
+        }
+
+        let items = [];
+        let nextItemTime = 0;
+
+        function initGame() {
+            items = [];
+            game.score = 0;
+            game.itemsCollected = 0;
+            game.timeRemaining = 60;
+            game.combo = 0;
+            game.maxCombo = 0;
+            game.isPaused = false;
+            game.gameOver = false;
+            game.collectedTypes = {};
+            nextItemTime = 0;
+
+            for (let i = 0; i < 5; i++) {
+                items.push(new Item());
+            }
+        }
+
+        function update() {
+            if (game.gameOver || game.isPaused) return;
+
+            game.timeRemaining -= 1 / 60;
+            if (game.timeRemaining <= 0) {
+                endGame();
+                return;
+            }
+
+            nextItemTime++;
+            if (nextItemTime > 30 && items.length < 12) {
+                items.push(new Item());
+                nextItemTime = 0;
+            }
+
+            items.forEach((item, idx) => {
+                item.update();
+                if (!item.isActive()) {
+                    items.splice(idx, 1);
+                    game.combo = 0;
+                }
+            });
+
+            updateUI();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#90EE90';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#228B22';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+            items.forEach(item => item.draw());
+
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Click items to collect them!', 15, 35);
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = game.score;
+            document.getElementById('items').textContent = game.itemsCollected;
+            document.getElementById('time').textContent = Math.max(0, Math.floor(game.timeRemaining));
+            document.getElementById('combo').textContent = game.combo;
+
+            const types = Object.keys(game.collectedTypes).map(t => `${t} (${game.collectedTypes[t]})`).join(', ');
+            document.getElementById('collected').textContent = types || 'None yet';
+        }
+
+        function endGame() {
+            game.gameOver = true;
+            document.getElementById('finalScore').textContent = game.score;
+            document.getElementById('finalItems').textContent = game.itemsCollected;
+            document.getElementById('finalCombo').textContent = game.maxCombo;
+
+            const collectedText = Object.entries(game.collectedTypes)
+                .map(([type, count]) => `${type}: ${count}`)
+                .join('<br>');
+            document.getElementById('collectedList').innerHTML = 'Items Collected:<br>' + (collectedText || 'None');
+            document.getElementById('gameOverScreen').style.display = 'block';
+            saveScore();
+        }
+
+        function togglePause() {
+            game.isPaused = !game.isPaused;
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            initGame();
+        }
+
+        function goHome() {
+            window.location.href = '/90s-games/';
+        }
+
+        function saveScore() {
+            let scores = JSON.parse(localStorage.getItem('natureCollectorScores') || '[]');
+            scores.push({
+                score: game.score,
+                items: game.itemsCollected,
+                combo: game.maxCombo,
+                date: new Date().toISOString()
+            });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('natureCollectorScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (!game.gameOver && !game.isPaused) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                let collected = false;
+                items.forEach((item, idx) => {
+                    if (item.isCollected(x, y)) {
+                        item.collected = true;
+                        items.splice(idx, 1);
+                        game.score += 10 + game.combo * 5;
+                        game.itemsCollected++;
+                        game.combo++;
+                        game.maxCombo = Math.max(game.maxCombo, game.combo);
+
+                        const type = item.type;
+                        game.collectedTypes[type] = (game.collectedTypes[type] || 0) + 1;
+
+                        collected = true;
+                    }
+                });
+
+                if (!collected && items.length > 0) {
+                    game.combo = 0;
+                }
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocean Explorer - 90s Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a3f5f, #1a5a8f);
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #1e90ff 0%, #4169e1 50%, #191970 100%);
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .stat {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: 2px solid #00CED1;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            border: 2px solid #00CED1;
+        }
+
+        button {
+            background: #00CED1;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #20FFFF;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            border: 3px solid #00CED1;
+        }
+
+        .game-over h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #00CED1;
+        }
+
+        .game-over p {
+            font-size: 1.3em;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐠 Ocean Explorer 🐠</h1>
+        <div class="stats">
+            <div class="stat">Oxygen: <span id="oxygen">100</span>%</div>
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Creatures: <span id="creatures">0</span></div>
+            <div class="stat">Depth: <span id="depth">0</span>m</div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            <button onclick="togglePause()">Pause</button>
+            <button onclick="restartGame()">Restart</button>
+            <button onclick="goHome()">Home</button>
+        </div>
+        <p style="margin-top: 15px; font-size: 0.9em;">Arrow keys to move | Space to interact</p>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p>Creatures Found: <span id="finalCreatures">0</span></p>
+        <p>Max Depth: <span id="finalDepth">0</span>m</p>
+        <button onclick="restartGame()" style="margin-top: 20px;">Play Again</button>
+        <button onclick="goHome()" style="margin-top: 20px;">Home</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            oxygen: 100,
+            score: 0,
+            creatures: 0,
+            depth: 0,
+            maxDepth: 0,
+            isPaused: false,
+            gameOver: false
+        };
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            width: 20,
+            height: 20,
+            vx: 0,
+            vy: 0,
+            speed: 5
+        };
+
+        const keys = {};
+
+        class Creature {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 3;
+                this.vy = (Math.random() - 0.5) * 3;
+                this.size = Math.random() * 8 + 5;
+                this.type = Math.floor(Math.random() * 4);
+                this.collected = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+
+                this.x = Math.max(0, Math.min(canvas.width, this.x));
+                this.y = Math.max(0, Math.min(canvas.height, this.y));
+            }
+
+            draw() {
+                const colors = ['#FFD700', '#FF69B4', '#00FF00', '#FF4500'];
+                ctx.fillStyle = colors[this.type];
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 8px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('*', this.x, this.y + 2);
+            }
+
+            isCollected(px, py) {
+                const dx = this.x - px;
+                const dy = this.y - py;
+                return Math.sqrt(dx * dx + dy * dy) < this.size + 15;
+            }
+        }
+
+        class Bubble {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vy = Math.random() * 2 + 1;
+                this.size = Math.random() * 3 + 2;
+                this.life = 60;
+            }
+
+            update() {
+                this.y -= this.vy;
+                this.x += Math.sin(this.y / 20) * 0.5;
+                this.life--;
+            }
+
+            draw() {
+                ctx.strokeStyle = `rgba(200, 230, 255, ${this.life / 60})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        let creatures = [];
+        let bubbles = [];
+
+        function initGame() {
+            creatures = [];
+            bubbles = [];
+            game.oxygen = 100;
+            game.score = 0;
+            game.creatures = 0;
+            game.depth = 0;
+            game.maxDepth = 0;
+            game.gameOver = false;
+            game.isPaused = false;
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+
+            for (let i = 0; i < 8; i++) {
+                creatures.push(new Creature());
+            }
+        }
+
+        function update() {
+            if (game.gameOver || game.isPaused) return;
+
+            player.vx = 0;
+            player.vy = 0;
+
+            if (keys['ArrowUp']) player.vy = -player.speed;
+            if (keys['ArrowDown']) player.vy = player.speed;
+            if (keys['ArrowLeft']) player.vx = -player.speed;
+            if (keys['ArrowRight']) player.vx = player.speed;
+
+            player.x += player.vx;
+            player.y += player.vy;
+
+            player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
+            player.y = Math.max(player.height / 2, Math.min(canvas.height - player.height / 2, player.y));
+
+            game.depth = Math.floor(player.y / canvas.height * 1000);
+            game.maxDepth = Math.max(game.maxDepth, game.depth);
+
+            game.oxygen -= 0.1;
+            if (game.oxygen <= 0) {
+                endGame();
+                return;
+            }
+
+            if (Math.random() < 0.05) {
+                bubbles.push(new Bubble(player.x, player.y));
+            }
+
+            creatures.forEach((creature, idx) => {
+                creature.update();
+
+                if (creature.isCollected(player.x, player.y)) {
+                    creatures.splice(idx, 1);
+                    game.score += 50;
+                    game.creatures++;
+                    game.oxygen += 15;
+                    game.oxygen = Math.min(100, game.oxygen);
+
+                    if (creatures.length === 0) {
+                        for (let i = 0; i < 10; i++) {
+                            creatures.push(new Creature());
+                        }
+                    }
+                }
+            });
+
+            bubbles = bubbles.filter(b => b.life > 0);
+            bubbles.forEach(b => b.update());
+
+            if (Math.random() < 0.02) {
+                creatures.push(new Creature());
+            }
+
+            updateUI();
+        }
+
+        function draw() {
+            ctx.fillStyle = 'rgba(30, 144, 255, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            bubbles.forEach(b => b.draw());
+            creatures.forEach(c => c.draw());
+
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(player.x - player.width / 2, player.y - player.height / 2, player.width, player.height);
+            ctx.strokeStyle = '#00CED1';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(player.x - player.width / 2, player.y - player.height / 2, player.width, player.height);
+
+            ctx.fillStyle = '#000';
+            ctx.font = '8px Arial';
+            ctx.fillText('O', player.x - 3, player.y + 2);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Creatures: ${game.creatures}`, 10, 30);
+        }
+
+        function updateUI() {
+            document.getElementById('oxygen').textContent = Math.max(0, Math.floor(game.oxygen));
+            document.getElementById('score').textContent = game.score;
+            document.getElementById('creatures').textContent = game.creatures;
+            document.getElementById('depth').textContent = game.depth;
+        }
+
+        function endGame() {
+            game.gameOver = true;
+            document.getElementById('finalScore').textContent = game.score;
+            document.getElementById('finalCreatures').textContent = game.creatures;
+            document.getElementById('finalDepth').textContent = game.maxDepth;
+            document.getElementById('gameOverScreen').style.display = 'block';
+            saveScore();
+        }
+
+        function togglePause() {
+            game.isPaused = !game.isPaused;
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            initGame();
+        }
+
+        function goHome() {
+            window.location.href = '/90s-games/';
+        }
+
+        function saveScore() {
+            let scores = JSON.parse(localStorage.getItem('oceanExplorerScores') || '[]');
+            scores.push({ score: game.score, creatures: game.creatures, depth: game.maxDepth, date: new Date().toISOString() });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('oceanExplorerScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

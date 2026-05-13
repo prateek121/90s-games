@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Solver - Puzzle Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            font-family: 'Courier New', monospace;
+            color: #00ffff;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 10px #00ffff;
+            border: 2px solid #00ffff;
+            padding: 15px 30px;
+            background: rgba(0, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            font-size: 1.1em;
+        }
+
+        .stat {
+            border: 1px solid #00ffff;
+            padding: 8px 15px;
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        #canvas {
+            border: 3px solid #00ffff;
+            background: #000;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        .instructions {
+            text-align: center;
+            color: #00ffff;
+            font-size: 0.95em;
+            max-width: 600px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            padding: 10px 25px;
+            font-size: 1em;
+            background: linear-gradient(135deg, #00ffff, #0088ff);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-family: 'Courier New', monospace;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .message {
+            min-height: 25px;
+            font-size: 1.2em;
+            text-shadow: 0 0 10px currentColor;
+            transition: color 0.3s;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>SEQUENCE SOLVER</h1>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Level: <span id="level">1</span></div>
+            <div class="stat">Moves: <span id="moves">0</span></div>
+        </div>
+        <div class="instructions" id="instructions"></div>
+        <canvas id="canvas" width="600" height="400"></canvas>
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+            <button onclick="game.undo()">Undo</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        class SequenceSolver {
+            constructor() {
+                this.canvas = canvas;
+                this.ctx = ctx;
+                this.score = 0;
+                this.level = 1;
+                this.moves = 0;
+                this.gameActive = true;
+                this.sequenceTypes = ['arithmetic', 'geometric', 'fibonacci', 'squares', 'alternating'];
+                this.currentSequence = [];
+                this.userSequence = [];
+                this.selectedNumbers = [];
+                this.history = [];
+
+                this.init();
+                this.setupEventListeners();
+            }
+
+            init() {
+                this.currentSequence = this.generateSequence();
+                this.userSequence = [];
+                this.selectedNumbers = [];
+                this.moves = 0;
+                this.updateUI();
+                this.showInstructions();
+            }
+
+            generateSequence() {
+                const type = this.sequenceTypes[Math.floor(Math.random() * this.sequenceTypes.length)];
+                let seq = [];
+
+                const start = Math.floor(Math.random() * 10) + 1;
+                const diff = Math.floor(Math.random() * 5) + 1;
+
+                switch(type) {
+                    case 'arithmetic':
+                        for (let i = 0; i < 7; i++) seq.push(start + i * diff);
+                        break;
+                    case 'geometric':
+                        for (let i = 0; i < 7; i++) seq.push(Math.floor(start * Math.pow(2, i)));
+                        break;
+                    case 'fibonacci':
+                        seq = [1, 1];
+                        for (let i = 2; i < 7; i++) seq.push(seq[i-1] + seq[i-2]);
+                        break;
+                    case 'squares':
+                        for (let i = 1; i <= 7; i++) seq.push(i * i);
+                        break;
+                    case 'alternating':
+                        for (let i = 0; i < 7; i++) {
+                            seq.push(i % 2 === 0 ? start + (i/2) * diff : start - (i/2) * diff);
+                        }
+                        break;
+                }
+
+                return seq.slice(0, 5 + Math.floor(this.level / 2));
+            }
+
+            showInstructions() {
+                document.getElementById('instructions').textContent =
+                    `Find the next ${Math.max(2, 3 - Math.floor(this.level / 2))} number(s) in the sequence by clicking them`;
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('click', (e) => {
+                    if (!this.gameActive) return;
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.handleClick(x, y);
+                });
+            }
+
+            handleClick(x, y) {
+                const cellWidth = this.canvas.width / 6;
+                const cellHeight = this.canvas.height / 2;
+                const col = Math.floor(x / cellWidth);
+                const row = Math.floor(y / cellHeight);
+                const idx = row * 6 + col;
+
+                if (idx < this.currentSequence.length) {
+                    this.userSequence.push(this.currentSequence[idx]);
+                    this.selectedNumbers.push(idx);
+                    this.history.push({sequence: [...this.userSequence], selected: [...this.selectedNumbers]});
+                    this.moves++;
+
+                    const targetLength = Math.max(2, 3 - Math.floor(this.level / 2));
+                    if (this.userSequence.length === targetLength) {
+                        this.checkAnswer();
+                    }
+                    this.updateUI();
+                }
+            }
+
+            checkAnswer() {
+                const targetLength = Math.max(2, 3 - Math.floor(this.level / 2));
+                const expected = this.currentSequence.slice(-targetLength);
+                const correct = this.userSequence.every((val, idx) => val === expected[idx]);
+
+                if (correct) {
+                    this.score += 100 * this.level + (100 - this.moves * 5);
+                    this.level++;
+                    this.gameActive = true;
+                    document.getElementById('message').textContent = 'Correct! Level ' + this.level;
+                    document.getElementById('message').className = 'message success';
+                    setTimeout(() => this.init(), 1500);
+                } else {
+                    document.getElementById('message').textContent = 'Wrong sequence. Try again!';
+                    document.getElementById('message').className = 'message error';
+                    this.userSequence = [];
+                    this.selectedNumbers = [];
+                }
+            }
+
+            undo() {
+                if (this.history.length > 0) {
+                    this.history.pop();
+                    if (this.history.length > 0) {
+                        const prev = this.history[this.history.length - 1];
+                        this.userSequence = [...prev.sequence];
+                        this.selectedNumbers = [...prev.selected];
+                    } else {
+                        this.userSequence = [];
+                        this.selectedNumbers = [];
+                    }
+                    this.updateUI();
+                }
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('moves').textContent = this.moves;
+            }
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                const cellWidth = this.canvas.width / 6;
+                const cellHeight = this.canvas.height / 2;
+
+                // Draw sequence numbers
+                let idx = 0;
+                for (let row = 0; row < 2; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        if (idx < this.currentSequence.length) {
+                            const x = col * cellWidth;
+                            const y = row * cellHeight;
+                            const isSelected = this.selectedNumbers.includes(idx);
+
+                            // Cell background
+                            this.ctx.fillStyle = isSelected ? '#0088ff' : '#1a1a1a';
+                            this.ctx.fillRect(x + 5, y + 5, cellWidth - 10, cellHeight - 10);
+
+                            // Border
+                            this.ctx.strokeStyle = isSelected ? '#00ffff' : '#00ff00';
+                            this.ctx.lineWidth = isSelected ? 3 : 1;
+                            this.ctx.strokeRect(x + 5, y + 5, cellWidth - 10, cellHeight - 10);
+
+                            // Number
+                            this.ctx.fillStyle = '#00ffff';
+                            this.ctx.font = 'bold 24px Courier New';
+                            this.ctx.textAlign = 'center';
+                            this.ctx.textBaseline = 'middle';
+                            this.ctx.fillText(this.currentSequence[idx], x + cellWidth/2, y + cellHeight/2);
+                        }
+                        idx++;
+                    }
+                }
+
+                // Draw user sequence at bottom
+                this.ctx.fillStyle = '#1a1a1a';
+                this.ctx.fillRect(10, this.canvas.height - 50, this.canvas.width - 20, 40);
+                this.ctx.strokeStyle = '#00ffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(10, this.canvas.height - 50, this.canvas.width - 20, 40);
+
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = '16px Courier New';
+                this.ctx.textAlign = 'left';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText('Your sequence: ' + (this.userSequence.length > 0 ? this.userSequence.join(', ') : 'Click numbers...'), 20, this.canvas.height - 30);
+            }
+
+            update() {
+                this.draw();
+                requestAnimationFrame(() => this.update());
+            }
+
+            reset() {
+                this.score = 0;
+                this.level = 1;
+                this.gameActive = true;
+                this.init();
+            }
+        }
+
+        const game = new SequenceSolver();
+        game.update();
+
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('sequenceSolverHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('sequenceSolverHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

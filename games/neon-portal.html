@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON PORTAL - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #2d0d4e 0%, #1a0033 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ddff;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(0, 221, 255, 0.6);
+        }
+        .info {
+            color: #00ddff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(0, 221, 255, 0.1);
+            border: 2px solid #00ddff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #00ddff;
+            color: #000;
+            border: 2px solid #00ddff;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 221, 255, 0.8); }
+        .controls {
+            background: rgba(0, 221, 255, 0.1);
+            border: 2px solid #00ddff;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Portals</div>
+                <div class="stat-value" id="portals">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                MOUSE Click to fire<br/>
+                Create portals<br/>
+                Connect endpoints!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 500,
+
+            portals: [],
+            particles: [],
+            connections: [],
+            score: 0,
+            portalCount: 0,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('neonPortalBest') || 0,
+            spawnCounter: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.firePortal(x, y);
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            firePortal(x, y) {
+                if (!this.gameRunning) return;
+
+                this.portals.push({
+                    x: x,
+                    y: y,
+                    radius: 15,
+                    color: `hsl(${this.portalCount * 60}, 100%, 50%)`,
+                    id: this.portalCount,
+                    life: 300
+                });
+                this.portalCount++;
+                this.score += 5;
+
+                // Check connections
+                if (this.portals.length >= 2) {
+                    const p1 = this.portals[this.portals.length - 1];
+                    const p2 = this.portals[this.portals.length - 2];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 150) {
+                        this.connections.push({ p1: p1, p2: p2, life: 60 });
+                        this.score += 50;
+                    }
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Update portals
+                this.portals = this.portals.filter(p => {
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                // Update connections
+                this.connections = this.connections.filter(c => {
+                    c.life--;
+                    return c.life > 0;
+                });
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('neonPortalBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw connections
+                for (let c of this.connections) {
+                    const alpha = c.life / 60;
+                    this.ctx.strokeStyle = `rgba(0, 221, 255, ${alpha})`;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(c.p1.x, c.p1.y);
+                    this.ctx.lineTo(c.p2.x, c.p2.y);
+                    this.ctx.stroke();
+                }
+
+                // Draw portals
+                for (let p of this.portals) {
+                    const pulse = 1 + Math.sin(p.id * 0.5) * 0.3;
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 300;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.radius * pulse, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = `rgba(0, 221, 255, ${p.life / 30})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`PORTALS: ${this.portals.length}`, 10, 25);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 50);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ddff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('portals').textContent = this.portals.length;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.portals = [];
+                this.particles = [];
+                this.connections = [];
+                this.score = 0;
+                this.portalCount = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.spawnCounter = 0;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMON - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Arial', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+        .game-board {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            border: 4px solid #fff;
+            border-radius: 50%;
+            background: #000;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(0, 0, 0, 0.8);
+        }
+        .simon-button {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border: 3px solid #333;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #fff;
+        }
+        .simon-button:hover { filter: brightness(1.2); }
+        .simon-button.active { filter: brightness(1.5); box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.8); }
+        #btn1 { top: 0; left: 0; background: radial-gradient(circle at 30% 30%, #ff6b6b, #cc0000); border-radius: 120px 0 0 0; }
+        #btn2 { top: 0; right: 0; background: radial-gradient(circle at 70% 30%, #4ecdc4, #0099cc); border-radius: 0 120px 0 0; }
+        #btn3 { bottom: 0; left: 0; background: radial-gradient(circle at 30% 70%, #ffe66d, #ffaa00); border-radius: 0 0 0 120px; }
+        #btn4 { bottom: 0; right: 0; background: radial-gradient(circle at 70% 70%, #95e1d3, #00cc66); border-radius: 0 0 120px 0; }
+        .display {
+            text-align: center;
+            color: white;
+        }
+        .display-value {
+            font-size: 48px;
+            font-weight: bold;
+            color: #00ff00;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        .status {
+            color: #ffff00;
+            font-size: 14px;
+            margin: 10px 0;
+            height: 20px;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            background: #00ff00;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); background: #00dd00; }
+        .stats {
+            background: rgba(0, 255, 0, 0.1);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            color: #00ff00;
+            font-size: 12px;
+            min-width: 250px;
+        }
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="text-align: center; color: white;">
+            <h1 style="font-size: 32px; margin-bottom: 10px;">SIMON</h1>
+            <p style="font-size: 14px; color: #ccc;">Remember the sequence and repeat it!</p>
+        </div>
+
+        <div class="game-board">
+            <div id="btn1" class="simon-button">1</div>
+            <div id="btn2" class="simon-button">2</div>
+            <div id="btn3" class="simon-button">3</div>
+            <div id="btn4" class="simon-button">4</div>
+        </div>
+
+        <div class="display">
+            <div style="font-size: 12px; color: #ccc;">LEVEL</div>
+            <div class="display-value" id="level">1</div>
+            <div class="status" id="status">Ready to start</div>
+        </div>
+
+        <div class="buttons">
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESTART</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-line">
+                <span>SEQUENCE LENGTH:</span>
+                <span id="sequenceLength">0</span>
+            </div>
+            <div class="stat-line">
+                <span>YOUR SCORE:</span>
+                <span id="score">0</span>
+            </div>
+            <div class="stat-line">
+                <span>BEST LEVEL:</span>
+                <span id="bestLevel">0</span>
+            </div>
+            <div class="stat-line">
+                <span>GAME STATUS:</span>
+                <span id="gameStatus">Waiting</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            sequence: [],
+            userSequence: [],
+            level: 1,
+            score: 0,
+            bestLevel: 0,
+            gameRunning: false,
+            playingSequence: false,
+            waitingForUser: false,
+            buttons: [
+                { id: 'btn1', sound: 400 },
+                { id: 'btn2', sound: 500 },
+                { id: 'btn3', sound: 300 },
+                { id: 'btn4', sound: 600 }
+            ],
+
+            init() {
+                this.buttons.forEach((btn, index) => {
+                    document.getElementById(btn.id).addEventListener('click', () => {
+                        if (this.waitingForUser) {
+                            this.userSequence.push(index);
+                            this.playButton(index);
+                            this.checkSequence();
+                        }
+                    });
+                });
+            },
+
+            start() {
+                if (!this.gameRunning) {
+                    this.gameRunning = true;
+                    this.sequence = [];
+                    this.level = 1;
+                    this.score = 0;
+                    this.nextLevel();
+                }
+            },
+
+            nextLevel() {
+                this.userSequence = [];
+                this.sequence.push(Math.floor(Math.random() * 4));
+                this.playingSequence = true;
+                this.waitingForUser = false;
+                document.getElementById('status').textContent = 'Watch the sequence';
+                document.getElementById('gameStatus').textContent = 'Playing sequence';
+
+                this.playSequence();
+            },
+
+            playSequence() {
+                let delay = 500;
+                this.sequence.forEach((buttonIndex, index) => {
+                    setTimeout(() => {
+                        this.playButton(buttonIndex);
+                        if (index === this.sequence.length - 1) {
+                            setTimeout(() => {
+                                this.playingSequence = false;
+                                this.waitingForUser = true;
+                                document.getElementById('status').textContent = 'Your turn!';
+                                document.getElementById('gameStatus').textContent = 'Waiting for input';
+                            }, 500);
+                        }
+                    }, delay * (index + 1));
+                });
+            },
+
+            playButton(index) {
+                const btn = document.getElementById(this.buttons[index].id);
+                btn.classList.add('active');
+                this.playSound(this.buttons[index].sound);
+                setTimeout(() => {
+                    btn.classList.remove('active');
+                }, 300);
+            },
+
+            playSound(frequency) {
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = 'sine';
+
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                } catch (e) {
+                    // Audio context not available
+                }
+            },
+
+            checkSequence() {
+                const userIndex = this.userSequence.length - 1;
+                if (this.userSequence[userIndex] !== this.sequence[userIndex]) {
+                    this.gameOver();
+                    return;
+                }
+
+                if (this.userSequence.length === this.sequence.length) {
+                    this.score += this.level * 100;
+                    this.level++;
+                    if (this.level - 1 > this.bestLevel) {
+                        this.bestLevel = this.level - 1;
+                    }
+
+                    this.waitingForUser = false;
+                    document.getElementById('status').textContent = 'Level complete! Get ready...';
+                    setTimeout(() => this.nextLevel(), 1000);
+                }
+            },
+
+            gameOver() {
+                this.gameRunning = false;
+                this.waitingForUser = false;
+                if (this.level - 1 > this.bestLevel) {
+                    this.bestLevel = this.level - 1;
+                }
+                document.getElementById('status').textContent = `Game Over! Level: ${this.level - 1}`;
+                document.getElementById('gameStatus').textContent = 'Game Over';
+            },
+
+            restart() {
+                this.sequence = [];
+                this.userSequence = [];
+                this.level = 1;
+                this.score = 0;
+                this.gameRunning = false;
+                this.playingSequence = false;
+                this.waitingForUser = false;
+                document.getElementById('status').textContent = 'Ready to start';
+                document.getElementById('gameStatus').textContent = 'Waiting';
+                this.updateDisplay();
+            },
+
+            updateDisplay() {
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('sequenceLength').textContent = this.sequence.length;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('bestLevel').textContent = this.bestLevel;
+            },
+
+            setupDisplay() {
+                setInterval(() => {
+                    this.updateDisplay();
+                }, 100);
+            }
+        };
+
+        game.init();
+        game.setupDisplay();
+    </script>
+</body>
+</html>

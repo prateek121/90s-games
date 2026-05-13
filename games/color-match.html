@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COLOR MATCH - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ffd700;
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+            display: block;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        .info {
+            color: #ffd700;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid #ffd700;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ffd700;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid #ffd700;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Accuracy</div>
+                <div class="stat-value" id="accuracy">0%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>RULES:</strong><br/>
+                Match center color<br/>
+                to outer bars<br/>
+                React quickly!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 500,
+
+            centerColor: { r: 255, g: 0, b: 0 },
+            barColors: [],
+            selectedBar: null,
+            score: 0,
+            correct: 0,
+            total: 0,
+            best: localStorage.getItem('colorMatchBest') || 0,
+            gameRunning: false,
+            gameOver: false,
+            timeLeft: 60,
+            initialTime: 60,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.generateColors();
+                this.gameLoop();
+            },
+
+            generateColors() {
+                this.centerColor = {
+                    r: Math.floor(Math.random() * 256),
+                    g: Math.floor(Math.random() * 256),
+                    b: Math.floor(Math.random() * 256)
+                };
+
+                this.barColors = [];
+                const correctIndex = Math.floor(Math.random() * 4);
+
+                for (let i = 0; i < 4; i++) {
+                    if (i === correctIndex) {
+                        this.barColors.push({ ...this.centerColor, correct: true });
+                    } else {
+                        this.barColors.push({
+                            r: Math.floor(Math.random() * 256),
+                            g: Math.floor(Math.random() * 256),
+                            b: Math.floor(Math.random() * 256),
+                            correct: false
+                        });
+                    }
+                }
+
+                this.selectedBar = null;
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.timeLeft = this.initialTime;
+
+                    const timer = setInterval(() => {
+                        if (this.gameRunning) {
+                            this.timeLeft--;
+                            if (this.timeLeft <= 0) {
+                                this.gameOver = true;
+                                this.gameRunning = false;
+                                clearInterval(timer);
+                                if (this.score > this.best) {
+                                    this.best = this.score;
+                                    localStorage.setItem('colorMatchBest', this.best);
+                                }
+                            }
+                        }
+                    }, 1000);
+                }
+            },
+
+            selectBar(index) {
+                if (!this.gameRunning) return;
+
+                const bar = this.barColors[index];
+                this.total++;
+
+                if (bar.correct) {
+                    this.score += Math.max(1, this.timeLeft);
+                    this.correct++;
+                } else {
+                    this.score = Math.max(0, this.score - 5);
+                }
+
+                this.generateColors();
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#1a1a2e');
+                gradient.addColorStop(1, '#16213e');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                const centerX = this.width / 2;
+                const centerY = this.height / 2;
+                const radius = 80;
+
+                // Draw center circle
+                const color = this.centerColor;
+                this.ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.strokeStyle = '#ffd700';
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+
+                // Draw bars
+                const barHeight = 60;
+                const barWidth = 120;
+                const positions = [
+                    { x: centerX - barWidth - 40, y: centerY - barHeight / 2 }, // Left
+                    { x: centerX + 40, y: centerY - barHeight / 2 },              // Right
+                    { x: centerX - barWidth / 2, y: centerY - barHeight - 40 },  // Top
+                    { x: centerX - barWidth / 2, y: centerY + 40 }                // Bottom
+                ];
+
+                for (let i = 0; i < 4; i++) {
+                    const bar = this.barColors[i];
+                    const pos = positions[i];
+
+                    this.ctx.fillStyle = `rgb(${bar.r}, ${bar.g}, ${bar.b})`;
+                    this.ctx.fillRect(pos.x, pos.y, barWidth, barHeight);
+
+                    this.ctx.strokeStyle = '#ffd700';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(pos.x, pos.y, barWidth, barHeight);
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ffd700';
+                this.ctx.font = 'bold 18px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 30);
+                this.ctx.fillText(`Time: ${this.timeLeft}s`, 10, 55);
+
+                const accuracy = this.total > 0 ? Math.round((this.correct / this.total) * 100) : 0;
+                this.ctx.fillText(`Accuracy: ${accuracy}%`, 10, 80);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffd700';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 40);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('accuracy').textContent = this.total > 0 ? Math.round((this.correct / this.total) * 100) + '%' : '0%';
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('click', (e) => {
+                    if (!this.gameRunning) {
+                        this.start();
+                        return;
+                    }
+
+                    const rect = this.canvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+                    const centerX = this.width / 2;
+                    const centerY = this.height / 2;
+
+                    // Check which bar was clicked
+                    const barHeight = 60;
+                    const barWidth = 120;
+
+                    // Left bar
+                    if (clickX >= centerX - barWidth - 40 && clickX <= centerX - 40 &&
+                        clickY >= centerY - barHeight / 2 && clickY <= centerY + barHeight / 2) {
+                        this.selectBar(0);
+                    }
+                    // Right bar
+                    else if (clickX >= centerX + 40 && clickX <= centerX + 40 + barWidth &&
+                             clickY >= centerY - barHeight / 2 && clickY <= centerY + barHeight / 2) {
+                        this.selectBar(1);
+                    }
+                    // Top bar
+                    else if (clickX >= centerX - barWidth / 2 && clickX <= centerX + barWidth / 2 &&
+                             clickY >= centerY - barHeight - 40 && clickY <= centerY - 40) {
+                        this.selectBar(2);
+                    }
+                    // Bottom bar
+                    else if (clickX >= centerX - barWidth / 2 && clickX <= centerX + barWidth / 2 &&
+                             clickY >= centerY + 40 && clickY <= centerY + 40 + barHeight) {
+                        this.selectBar(3);
+                    }
+                });
+            },
+
+            restart() {
+                this.centerColor = { r: 255, g: 0, b: 0 };
+                this.barColors = [];
+                this.score = 0;
+                this.correct = 0;
+                this.total = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.timeLeft = this.initialTime;
+                this.generateColors();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS PAINTER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a2636 0%, #0f1a2e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ffff;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+        }
+        .info {
+            color: #00ffff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid #00ffff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #00ffff;
+            color: #000;
+            border: 2px solid #00ffff;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
+        .controls {
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid #00ffff;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                MOUSE Draw paths<br/>
+                Connect nodes<br/>
+                Complete patterns!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 500,
+
+            nodes: [],
+            lines: [],
+            particles: [],
+            score: 0,
+            level: 1,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('nexusPainterBest') || 0,
+            mouseDown: false,
+            dragging: false,
+            dragFrom: null,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.generateLevel();
+                }
+            },
+
+            generateLevel() {
+                this.nodes = [];
+                const nodeCount = 5 + this.level;
+                for (let i = 0; i < nodeCount; i++) {
+                    this.nodes.push({
+                        x: Math.random() * (this.width - 100) + 50,
+                        y: Math.random() * (this.height - 100) + 50,
+                        radius: 15,
+                        color: `hsl(${(i * 360 / nodeCount) % 360}, 100%, 50%)`,
+                        connected: false,
+                        targetConnections: Math.min(i + 1, 3)
+                    });
+                }
+                this.lines = [];
+            },
+
+            handleMouseDown(e) {
+                if (!this.gameRunning) return;
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                for (let node of this.nodes) {
+                    const dx = x - node.x;
+                    const dy = y - node.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < node.radius) {
+                        this.mouseDown = true;
+                        this.dragging = true;
+                        this.dragFrom = node;
+                        break;
+                    }
+                }
+            },
+
+            handleMouseMove(e) {
+                if (!this.gameRunning || !this.dragging) return;
+                const rect = this.canvas.getBoundingClientRect();
+                this.mouseX = e.clientX - rect.left;
+                this.mouseY = e.clientY - rect.top;
+            },
+
+            handleMouseUp(e) {
+                if (!this.gameRunning || !this.dragging) {
+                    this.mouseDown = false;
+                    return;
+                }
+
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                for (let i = 0; i < this.nodes.length; i++) {
+                    const node = this.nodes[i];
+                    if (node === this.dragFrom) continue;
+                    const dx = x - node.x;
+                    const dy = y - node.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < node.radius) {
+                        this.createLine(this.dragFrom, node);
+                        break;
+                    }
+                }
+
+                this.mouseDown = false;
+                this.dragging = false;
+                this.dragFrom = null;
+            },
+
+            createLine(from, to) {
+                const existing = this.lines.find(l =>
+                    (l.from === from && l.to === to) || (l.from === to && l.to === from)
+                );
+                if (existing) return;
+
+                this.lines.push({ from, to, color: from.color });
+                this.score += 20 * this.level;
+
+                // Check level completion
+                const allConnected = this.nodes.every(n => {
+                    const connections = this.lines.filter(l => l.from === n || l.to === n).length;
+                    return connections >= n.targetConnections;
+                });
+
+                if (allConnected) {
+                    this.level++;
+                    this.generateLevel();
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.life--;
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    return p.life > 0;
+                });
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('nexusPainterBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw lines
+                for (let line of this.lines) {
+                    this.ctx.strokeStyle = line.color;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(line.from.x, line.from.y);
+                    this.ctx.lineTo(line.to.x, line.to.y);
+                    this.ctx.stroke();
+                }
+
+                // Draw dragging line
+                if (this.dragging && this.dragFrom) {
+                    this.ctx.strokeStyle = this.dragFrom.color;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.dragFrom.x, this.dragFrom.y);
+                    this.ctx.lineTo(this.mouseX || this.dragFrom.x, this.mouseY || this.dragFrom.y);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]);
+                }
+
+                // Draw nodes
+                for (let node of this.nodes) {
+                    this.ctx.fillStyle = node.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = `rgba(0, 255, 255, ${p.life / 10})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ffff';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`LEVEL: ${this.level}`, 10, 25);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 50);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.nodes = [];
+                this.lines = [];
+                this.particles = [];
+                this.score = 0;
+                this.level = 1;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.dragging = false;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

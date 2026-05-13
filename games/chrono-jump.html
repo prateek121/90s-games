@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHRONO JUMP - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #3a1a6a, #1a0a3a);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ffaa00;
+            background: #1a0a3a;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+        }
+        .info {
+            color: #ffaa00;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffaa00;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ffaa00;
+            color: #1a0a3a;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.1); box-shadow: 0 0 10px rgba(255, 170, 0, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #ffaa00;">⏱ CHRONO JUMP ⏱</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Level: <span id="level">1</span> | Time Warp: <span id="timeWarp">0</span> | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">SPACE to jump • Jump on platforms in time</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            player: { x: 175, y: 520, width: 20, height: 20, vy: 0, jumping: false, jumpPower: 12, gravity: 0.6 },
+            platforms: [],
+            timeShards: [],
+            particles: [],
+            score: 0,
+            level: 1,
+            timeWarp: 0,
+            highScore: localStorage.getItem('chronoJumpHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            cameraY: 0,
+            keys: {},
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 520, width: 20, height: 20, vy: 0, jumping: false, jumpPower: 12, gravity: 0.6 };
+                this.platforms = this.generatePlatforms();
+                this.timeShards = this.spawnTimeShards();
+                this.particles = [];
+                this.score = 0;
+                this.level = 1;
+                this.timeWarp = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.cameraY = 0;
+                this.keys = {};
+            },
+
+            generatePlatforms() {
+                const platforms = [];
+                for (let i = 0; i < 15; i++) {
+                    const y = 550 - i * 70 + (Math.random() * 10 - 5);
+                    const width = 50 + Math.random() * 50;
+                    const x = Math.random() * (this.width - width);
+                    const unstable = Math.random() < 0.3;
+                    platforms.push({
+                        x, y, width, height: 12,
+                        color: unstable ? '#ff6b6b' : '#ffaa00',
+                        disappearTimer: 0,
+                        maxTimer: unstable ? 30 : 0,
+                        timeLimit: 80 + i * 10
+                    });
+                }
+                return platforms;
+            },
+
+            spawnTimeShards() {
+                const shards = [];
+                for (let i = 0; i < 5; i++) {
+                    shards.push({
+                        x: Math.random() * this.width,
+                        y: Math.random() * this.height - 200,
+                        radius: 4,
+                        pulse: Math.random() * Math.PI * 2
+                    });
+                }
+                return shards;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Player horizontal movement
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    this.player.x -= 4;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    this.player.x += 4;
+                }
+
+                // Boundary
+                this.player.x = Math.max(0, Math.min(this.width - this.player.width, this.player.x));
+
+                // Jump
+                if (this.keys[' '] && !this.player.jumping) {
+                    this.player.vy = -this.player.jumpPower;
+                    this.player.jumping = true;
+                    this.keys[' '] = false;
+                }
+
+                // Gravity
+                this.player.vy += this.player.gravity;
+                this.player.y += this.player.vy;
+
+                // Platform collision
+                for (let platform of this.platforms) {
+                    if (this.player.vy > 0 &&
+                        this.player.y + this.player.height >= platform.y &&
+                        this.player.y + this.player.height <= platform.y + platform.height + 5 &&
+                        this.player.x + this.player.width > platform.x &&
+                        this.player.x < platform.x + platform.width &&
+                        platform.disappearTimer === 0) {
+
+                        this.player.vy = 0;
+                        this.player.y = platform.y - this.player.height;
+                        this.player.jumping = false;
+                        this.score += 10;
+
+                        // Platform timer
+                        if (platform.maxTimer > 0) {
+                            platform.disappearTimer = platform.maxTimer;
+                        }
+
+                        this.createParticles(this.player.x + this.player.width / 2, platform.y);
+                    }
+                }
+
+                // Time shard collection
+                for (let i = this.timeShards.length - 1; i >= 0; i--) {
+                    const shard = this.timeShards[i];
+                    const dist = Math.hypot(this.player.x - shard.x, this.player.y - shard.y);
+                    if (dist < this.player.width / 2 + shard.radius) {
+                        this.timeShards.splice(i, 1);
+                        this.timeWarp += 5;
+                        this.score += 50;
+                        this.createParticles(shard.x, shard.y);
+                    }
+                }
+
+                // Spawn new time shards
+                if (this.timeShards.length < 3 && Math.random() < 0.02) {
+                    this.timeShards.push({
+                        x: Math.random() * this.width,
+                        y: this.cameraY - 100,
+                        radius: 4,
+                        pulse: Math.random() * Math.PI * 2
+                    });
+                }
+
+                // Remove disappeared platforms and track progress
+                this.platforms = this.platforms.filter(p => {
+                    if (p.disappearTimer > 0) {
+                        p.disappearTimer--;
+                    }
+                    return p.y < this.cameraY + this.height + 100;
+                });
+
+                // Add new platforms
+                if (this.platforms.length < 10) {
+                    const topPlatform = this.platforms.reduce((min, p) => p.y < min.y ? p : min);
+                    const newY = topPlatform.y - 70;
+                    const width = 50 + Math.random() * 50;
+                    const x = Math.random() * (this.width - width);
+                    this.platforms.push({
+                        x, y: newY, width, height: 12,
+                        color: Math.random() < 0.3 ? '#ff6b6b' : '#ffaa00',
+                        disappearTimer: 0,
+                        maxTimer: Math.random() < 0.3 ? 30 : 0,
+                        timeLimit: 80 + this.frameCount / 100
+                    });
+                }
+
+                // Camera follow
+                this.cameraY = Math.max(0, this.player.y - 300);
+
+                // Game over
+                if (this.player.y > this.height + 100) {
+                    this.endGame();
+                    return;
+                }
+
+                // Level up
+                this.score = Math.max(this.score, Math.floor(this.cameraY / 10));
+                if (this.score > 0 && this.score % 200 === 0) {
+                    this.level = Math.floor(this.score / 200) + 1;
+                    this.player.jumpPower += 0.2;
+                }
+
+                // Particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('timeWarp').textContent = this.timeWarp;
+                this.frameCount++;
+            },
+
+            createParticles(x, y) {
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        life: 12,
+                        color: '#ffaa00'
+                    });
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('chronoJumpHigh', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background with gradient
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#3a1a6a');
+                gradient.addColorStop(1, '#1a0a3a');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Parallax stars
+                this.ctx.fillStyle = '#ffffff';
+                for (let i = 0; i < 10; i++) {
+                    const y = (this.frameCount * 0.05 + i * 60 - this.cameraY * 0.2) % this.height;
+                    this.ctx.fillRect(i * 40, y, 2, 2);
+                }
+
+                // Platforms
+                for (let platform of this.platforms) {
+                    const screenY = platform.y - this.cameraY;
+                    if (screenY > -50 && screenY < this.height) {
+                        this.ctx.fillStyle = platform.disappearTimer > 0 ? 'rgba(255, 107, 107, 0.5)' : platform.color;
+                        this.ctx.fillRect(platform.x, screenY, platform.width, platform.height);
+                        if (platform.disappearTimer === 0) {
+                            this.ctx.strokeStyle = '#ffaa00';
+                            this.ctx.lineWidth = 2;
+                            this.ctx.strokeRect(platform.x, screenY, platform.width, platform.height);
+                        }
+                    }
+                }
+
+                // Time shards
+                for (let shard of this.timeShards) {
+                    const screenY = shard.y - this.cameraY;
+                    if (screenY > -50 && screenY < this.height) {
+                        shard.pulse += 0.05;
+                        const scale = 1 + Math.sin(shard.pulse) * 0.3;
+                        this.ctx.fillStyle = '#00ffff';
+                        this.ctx.beginPath();
+                        this.ctx.arc(shard.x, screenY, shard.radius * scale, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    const screenY = p.y - this.cameraY;
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 12;
+                    this.ctx.fillRect(p.x, screenY, 3, 3);
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Player
+                const playerScreenY = this.player.y - this.cameraY;
+                this.ctx.fillStyle = '#ffaa00';
+                this.ctx.fillRect(this.player.x, playerScreenY, this.player.width, this.player.height);
+                this.ctx.strokeStyle = '#ff6b00';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.player.x, playerScreenY, this.player.width, this.player.height);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffaa00';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('TIME OUT!', this.width / 2, this.height / 2 - 30);
+                    this.ctx.font = '16px Arial';
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText(`Level: ${this.level}`, this.width / 2, this.height / 2 + 45);
+                }
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartridge Dash</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(45deg, #001a33, #003366);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            background: linear-gradient(to bottom, #000, #001a33);
+            border: 4px solid #00ccff;
+            box-shadow: 0 0 20px rgba(0, 204, 255, 0.5), inset 0 0 20px rgba(0, 204, 255, 0.1);
+            padding: 20px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #00ccff;
+            text-shadow: 0 0 10px #00ccff;
+            margin-bottom: 10px;
+            font-size: 2em;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            color: #00ccff;
+            font-size: 0.9em;
+        }
+
+        .stat {
+            background: rgba(0, 204, 255, 0.1);
+            padding: 8px;
+            border: 2px solid #00ccff;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        canvas {
+            background: #000;
+            border: 3px solid #00ccff;
+            display: block;
+            margin: 15px auto;
+            box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+            image-rendering: pixelated;
+        }
+
+        .controls {
+            color: #00ccff;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        button {
+            background: #00ccff;
+            color: #000;
+            border: none;
+            padding: 10px 30px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #00ffff;
+            box-shadow: 0 0 10px #00ccff;
+        }
+
+        .message {
+            color: #ff99ff;
+            font-size: 1.1em;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #ff99ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CARTRIDGE DASH</h1>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">POINTS</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">LEVEL</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">CHAIN</div>
+                <div class="stat-value" id="chain">0</div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="400"></canvas>
+
+        <div class="controls">
+            <p>Arrow Keys to Move | Space to Dash | Collect Items</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <button id="startBtn" onclick="game.start()">START DASH</button>
+        <button onclick="location.reload()">RESET</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            running: false,
+            score: 0,
+            level: 1,
+            chain: 0,
+            timeLeft: 90,
+            startTime: 0,
+
+            player: {
+                x: 225,
+                y: 350,
+                width: 25,
+                height: 25,
+                speed: 4,
+                dashing: false,
+                dashCooldown: 0,
+                dashSpeed: 8,
+                dashDuration: 0
+            },
+
+            items: [],
+            hazards: [],
+            particles: [],
+            keys: {},
+
+            init() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        this.dash();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            start() {
+                this.running = true;
+                this.score = 0;
+                this.level = 1;
+                this.chain = 0;
+                this.timeLeft = 90;
+                this.startTime = Date.now();
+                this.items = [];
+                this.hazards = [];
+                this.particles = [];
+                document.getElementById('startBtn').disabled = true;
+                this.spawnItems();
+                this.spawnHazards();
+                this.update();
+            },
+
+            dash() {
+                if (this.player.dashCooldown > 0) return;
+                this.player.dashing = true;
+                this.player.dashDuration = 10;
+                this.player.dashCooldown = 40;
+            },
+
+            spawnItems() {
+                for (let i = 0; i < 8 + this.level * 2; i++) {
+                    this.items.push({
+                        x: Math.random() * (canvas.width - 20),
+                        y: Math.random() * (canvas.height - 80),
+                        width: 15,
+                        height: 15,
+                        type: Math.random() > 0.7 ? 'bonus' : 'normal',
+                        collected: false
+                    });
+                }
+            },
+
+            spawnHazards() {
+                for (let i = 0; i < 3 + this.level; i++) {
+                    this.hazards.push({
+                        x: Math.random() * (canvas.width - 30),
+                        y: Math.random() * (canvas.height - 100),
+                        width: 30,
+                        height: 20,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2
+                    });
+                }
+            },
+
+            createParticles(x, y, color, count = 5) {
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        x,
+                        y,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: (Math.random() - 0.5) * 4 - 1,
+                        life: 20,
+                        color
+                    });
+                }
+            },
+
+            update() {
+                if (!this.running) return;
+
+                this.timeLeft = Math.max(0, 90 - Math.floor((Date.now() - this.startTime) / 1000));
+
+                // Player movement
+                const speed = this.player.dashing ? this.player.dashSpeed : this.player.speed;
+                if (this.keys['ArrowLeft'] || this.keys['a']) this.player.x -= speed;
+                if (this.keys['ArrowRight'] || this.keys['d']) this.player.x += speed;
+                if (this.keys['ArrowUp'] || this.keys['w']) this.player.y -= speed;
+                if (this.keys['ArrowDown'] || this.keys['s']) this.player.y += speed;
+
+                // Boundaries
+                this.player.x = Math.max(0, Math.min(canvas.width - this.player.width, this.player.x));
+                this.player.y = Math.max(0, Math.min(canvas.height - this.player.height, this.player.y));
+
+                // Update dash
+                if (this.player.dashDuration > 0) {
+                    this.player.dashDuration--;
+                    if (this.player.dashDuration === 0) {
+                        this.player.dashing = false;
+                    }
+                }
+                if (this.player.dashCooldown > 0) this.player.dashCooldown--;
+
+                // Move hazards
+                for (const hazard of this.hazards) {
+                    hazard.x += hazard.vx;
+                    hazard.y += hazard.vy;
+
+                    if (hazard.x <= 0 || hazard.x + hazard.width >= canvas.width) hazard.vx *= -1;
+                    if (hazard.y <= 0 || hazard.y + hazard.height >= canvas.height - 80) hazard.vy *= -1;
+
+                    if (this.collides(this.player, hazard) && !this.player.dashing) {
+                        this.running = false;
+                        document.getElementById('message').textContent = 'HIT! Final Score: ' + this.score;
+                        document.getElementById('startBtn').disabled = false;
+                        this.saveScore();
+                        return;
+                    }
+                }
+
+                // Collect items
+                for (let i = this.items.length - 1; i >= 0; i--) {
+                    if (!this.items[i].collected && this.collides(this.player, this.items[i])) {
+                        const points = this.items[i].type === 'bonus' ? 500 + (this.chain * 100) : 100 + (this.chain * 25);
+                        this.score += points;
+                        this.chain++;
+                        this.createParticles(this.items[i].x, this.items[i].y, '#ffff00', 8);
+                        this.items[i].collected = true;
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    this.particles[i].x += this.particles[i].vx;
+                    this.particles[i].y += this.particles[i].vy;
+                    this.particles[i].life--;
+                    if (this.particles[i].life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                if (this.timeLeft <= 0) {
+                    this.running = false;
+                    document.getElementById('message').textContent = 'TIME UP! Final Score: ' + this.score;
+                    document.getElementById('startBtn').disabled = false;
+                    this.saveScore();
+                    return;
+                }
+
+                this.draw();
+                this.updateUI();
+                requestAnimationFrame(() => this.update());
+            },
+
+            collides(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw items
+                ctx.fillStyle = '#ffff00';
+                for (const item of this.items) {
+                    if (!item.collected) {
+                        if (item.type === 'bonus') {
+                            ctx.globalAlpha = 0.7 + Math.sin(Date.now() / 200) * 0.3;
+                        }
+                        ctx.fillRect(item.x, item.y, item.width, item.height);
+                        ctx.globalAlpha = 1;
+                    }
+                }
+
+                // Draw hazards
+                ctx.fillStyle = '#ff0000';
+                for (const hazard of this.hazards) {
+                    ctx.fillRect(hazard.x, hazard.y, hazard.width, hazard.height);
+                }
+
+                // Draw player
+                ctx.fillStyle = this.player.dashing ? '#00ff00' : '#00ccff';
+                ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+
+                // Draw particles
+                for (const p of this.particles) {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life / 20;
+                    ctx.fillRect(p.x, p.y, 3, 3);
+                    ctx.globalAlpha = 1;
+                }
+
+                // Draw time
+                ctx.fillStyle = '#00ccff';
+                ctx.font = 'bold 14px Courier New';
+                ctx.textAlign = 'left';
+                ctx.fillText('TIME: ' + this.timeLeft, 10, 390);
+            },
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('chain').textContent = this.chain;
+            },
+
+            saveScore() {
+                let scores = JSON.parse(localStorage.getItem('cartridgeScores') || '[]');
+                scores.push({ score: this.score, chain: this.chain, date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.score - a.score);
+                localStorage.setItem('cartridgeScores', JSON.stringify(scores.slice(0, 10)));
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

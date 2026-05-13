@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOWER OF HANOI - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 { color: white; margin-bottom: 20px; font-size: 32px; }
+        .game-area {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            border-radius: 8px;
+            margin: 20px 0;
+            min-width: 600px;
+        }
+        .rod {
+            display: flex;
+            flex-direction: column-reverse;
+            width: 80px;
+            height: 300px;
+            border: 3px solid #ecf0f1;
+            border-radius: 4px;
+            position: relative;
+            background: rgba(52, 152, 219, 0.1);
+        }
+        .rod::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 250px;
+            background: #95a5a6;
+            border-radius: 2px;
+        }
+        .disk {
+            background: linear-gradient(to right, #3498db, #2980b9);
+            border: 2px solid #2c3e50;
+            border-radius: 4px;
+            cursor: grab;
+            margin: 2px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .disk:hover { transform: scale(1.05); cursor: grab; }
+        .disk:active { cursor: grabbing; }
+        .disk.selected { box-shadow: 0 0 15px rgba(52, 152, 219, 0.8); }
+        .info {
+            color: white;
+            margin: 20px 0;
+        }
+        .stat { font-size: 18px; margin: 10px 0; color: #ecf0f1; }
+        .stat strong { color: #f39c12; }
+        button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+        }
+        button:hover { background: #2980b9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗼 TOWER OF HANOI 🗼</h1>
+
+        <div class="game-area">
+            <div class="rod" id="rod0"></div>
+            <div class="rod" id="rod1"></div>
+            <div class="rod" id="rod2"></div>
+        </div>
+
+        <div class="info">
+            <div class="stat">Moves: <strong id="moves">0</strong></div>
+            <div class="stat">Minimum: <strong id="minimum">7</strong></div>
+        </div>
+
+        <div>
+            <button onclick="game.reset()">RESET</button>
+            <button onclick="game.addDisk()">ADD DISK</button>
+            <button onclick="game.removeDisk()">REMOVE DISK</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            rods: [[], [], []],
+            selectedDisk: null,
+            selectedRod: null,
+            moves: 0,
+            diskCount: 3,
+
+            init() {
+                this.reset();
+                this.setupInput();
+            },
+
+            reset() {
+                this.rods = [[], [], []];
+                for (let i = this.diskCount; i > 0; i--) {
+                    this.rods[0].push(i);
+                }
+                this.selectedDisk = null;
+                this.selectedRod = null;
+                this.moves = 0;
+                this.render();
+            },
+
+            addDisk() {
+                if (this.diskCount < 8) {
+                    this.diskCount++;
+                    this.reset();
+                }
+            },
+
+            removeDisk() {
+                if (this.diskCount > 1) {
+                    this.diskCount--;
+                    this.reset();
+                }
+            },
+
+            selectDisk(rodIndex) {
+                if (this.rods[rodIndex].length > 0) {
+                    this.selectedRod = rodIndex;
+                    this.selectedDisk = this.rods[rodIndex][this.rods[rodIndex].length - 1];
+                }
+            },
+
+            moveDisk(targetRodIndex) {
+                if (this.selectedRod === null) return;
+                if (this.selectedRod === targetRodIndex) {
+                    this.selectedRod = null;
+                    this.selectedDisk = null;
+                    this.render();
+                    return;
+                }
+
+                const sourceDisk = this.rods[this.selectedRod][this.rods[this.selectedRod].length - 1];
+                const targetDisk = this.rods[targetRodIndex].length > 0 ? this.rods[targetRodIndex][this.rods[targetRodIndex].length - 1] : null;
+
+                if (targetDisk === null || sourceDisk < targetDisk) {
+                    this.rods[targetRodIndex].push(sourceDisk);
+                    this.rods[this.selectedRod].pop();
+                    this.moves++;
+                }
+
+                this.selectedRod = null;
+                this.selectedDisk = null;
+                this.render();
+            },
+
+            isWon() {
+                return this.rods[2].length === this.diskCount;
+            },
+
+            render() {
+                for (let rodIndex = 0; rodIndex < 3; rodIndex++) {
+                    const rodEl = document.getElementById(`rod${rodIndex}`);
+                    rodEl.innerHTML = '';
+
+                    for (let disk of this.rods[rodIndex]) {
+                        const diskEl = document.createElement('div');
+                        diskEl.className = 'disk';
+                        diskEl.style.width = (20 + disk * 15) + 'px';
+                        diskEl.textContent = disk;
+                        diskEl.onclick = () => this.selectDisk(rodIndex);
+                        if (disk === this.selectedDisk && rodIndex === this.selectedRod) {
+                            diskEl.classList.add('selected');
+                        }
+                        rodEl.appendChild(diskEl);
+                    }
+
+                    // Click on rod to place disk
+                    rodEl.addEventListener('click', (e) => {
+                        if (e.target === rodEl) {
+                            this.moveDisk(rodIndex);
+                        }
+                    });
+                }
+
+                document.getElementById('moves').textContent = this.moves;
+                document.getElementById('minimum').textContent = Math.pow(2, this.diskCount) - 1;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === '1') this.selectDisk(0);
+                    if (e.key === '2') this.selectDisk(1);
+                    if (e.key === '3') this.selectDisk(2);
+                });
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

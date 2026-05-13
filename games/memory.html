@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEMORY - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Arial', monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            gap: 10px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            width: fit-content;
+        }
+        .card {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 3px solid #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            user-select: none;
+        }
+        .card:hover { transform: scale(1.05); }
+        .card.flipped {
+            background: #fff;
+            color: #667eea;
+        }
+        .card.matched {
+            opacity: 0.5;
+            cursor: default;
+        }
+        .stats {
+            color: white;
+            margin-top: 30px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .stat-item {
+            font-size: 14px;
+            margin: 8px 0;
+        }
+        .stat-label {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .stat-value {
+            color: #fff;
+            font-size: 20px;
+            margin-top: 5px;
+        }
+        .buttons {
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #fff;
+            color: #667eea;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 0 5px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); background: #ffd700; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 MEMORY GAME 🧠</h1>
+
+        <div class="game-board" id="gameBoard"></div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">MOVES</div>
+                <div class="stat-value" id="moves">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">MATCHES</div>
+                <div class="stat-value" id="matches">0/8</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">TIME</div>
+                <div class="stat-value" id="time">0s</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">BEST TIME</div>
+                <div class="stat-value" id="bestTime">--</div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button onclick="game.reset()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const EMOJIS = ['🎮', '🎨', '🎭', '🎪', '🎯', '🎲', '🎸', '🎬'];
+
+        const game = {
+            cards: [],
+            flipped: [],
+            matched: [],
+            moves: 0,
+            time: 0,
+            gameStarted: false,
+            gameComplete: false,
+            bestTime: localStorage.getItem('memoryBestTime') || null,
+            timerInterval: null,
+
+            init() {
+                this.createCards();
+                this.render();
+                this.updateStats();
+            },
+
+            createCards() {
+                const deck = [...EMOJIS, ...EMOJIS];
+                this.cards = deck.sort(() => Math.random() - 0.5).map((emoji, index) => ({
+                    id: index,
+                    emoji: emoji,
+                    flipped: false,
+                    matched: false
+                }));
+            },
+
+            render() {
+                const board = document.getElementById('gameBoard');
+                board.innerHTML = '';
+                this.cards.forEach(card => {
+                    const cardEl = document.createElement('div');
+                    cardEl.className = 'card';
+                    if (card.matched) cardEl.classList.add('matched');
+                    if (card.flipped) cardEl.classList.add('flipped');
+
+                    cardEl.textContent = card.flipped || card.matched ? card.emoji : '?';
+                    cardEl.onclick = () => this.flipCard(card.id);
+                    board.appendChild(cardEl);
+                });
+            },
+
+            flipCard(id) {
+                if (!this.gameStarted) {
+                    this.gameStarted = true;
+                    this.timerInterval = setInterval(() => {
+                        this.time++;
+                        document.getElementById('time').textContent = this.time + 's';
+                    }, 1000);
+                }
+
+                const card = this.cards[id];
+                if (card.flipped || card.matched || this.flipped.length >= 2) return;
+
+                card.flipped = true;
+                this.flipped.push(id);
+                this.render();
+
+                if (this.flipped.length === 2) {
+                    this.moves++;
+                    const [id1, id2] = this.flipped;
+                    if (this.cards[id1].emoji === this.cards[id2].emoji) {
+                        this.cards[id1].matched = true;
+                        this.cards[id2].matched = true;
+                        this.matched.push(id1, id2);
+                        this.flipped = [];
+                        this.render();
+
+                        if (this.matched.length === this.cards.length) {
+                            this.gameComplete = true;
+                            clearInterval(this.timerInterval);
+                            setTimeout(() => alert(`🎉 You won in ${this.moves} moves and ${this.time} seconds!`), 500);
+                            if (!this.bestTime || this.time < parseInt(this.bestTime)) {
+                                this.bestTime = this.time;
+                                localStorage.setItem('memoryBestTime', this.time);
+                            }
+                        }
+                    } else {
+                        setTimeout(() => {
+                            this.cards[id1].flipped = false;
+                            this.cards[id2].flipped = false;
+                            this.flipped = [];
+                            this.render();
+                        }, 1000);
+                    }
+                }
+                this.updateStats();
+            },
+
+            reset() {
+                this.cards = [];
+                this.flipped = [];
+                this.matched = [];
+                this.moves = 0;
+                this.time = 0;
+                this.gameStarted = false;
+                this.gameComplete = false;
+                clearInterval(this.timerInterval);
+                this.createCards();
+                this.render();
+                this.updateStats();
+            },
+
+            updateStats() {
+                document.getElementById('moves').textContent = this.moves;
+                document.getElementById('matches').textContent = this.matched.length / 2 + '/8';
+                document.getElementById('bestTime').textContent = this.bestTime ? this.bestTime + 's' : '--';
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Maze - 90s Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #001a33, #003d66);
+            font-family: 'Courier New', monospace;
+            color: #00FFFF;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            text-shadow: 0 0 10px #00FFFF;
+            letter-spacing: 2px;
+        }
+
+        #gameCanvas {
+            border: 2px solid #00FFFF;
+            background: #000;
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            text-shadow: 0 0 5px #00FFFF;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: rgba(0, 255, 255, 0.1);
+            padding: 8px 15px;
+            border: 1px solid #00FFFF;
+            border-radius: 3px;
+            margin: 3px;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #00FFFF;
+            border-radius: 3px;
+        }
+
+        button {
+            background: rgba(0, 255, 255, 0.1);
+            color: #00FFFF;
+            border: 1px solid #00FFFF;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            text-shadow: 0 0 5px #00FFFF;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 10px #00FFFF;
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border: 2px solid #00FFFF;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            border-radius: 3px;
+        }
+
+        .game-over h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00FFFF;
+        }
+
+        .game-over p {
+            font-size: 1em;
+            margin: 10px 0;
+            text-shadow: 0 0 5px #00FFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>>> DIGITAL_MAZE.EXE</h1>
+        <div class="stats">
+            <div class="stat">CIRCUITS: <span id="circuits">0</span></div>
+            <div class="stat">SCORE: <span id="score">0</span></div>
+            <div class="stat">TIME: <span id="time">0</span>s</div>
+            <div class="stat">LEVEL: <span id="level">1</span></div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            <button onclick="togglePause()">PAUSE</button>
+            <button onclick="restartGame()">RESTART</button>
+            <button onclick="goHome()">EXIT</button>
+        </div>
+        <p style="margin-top: 15px; font-size: 0.85em;">Arrow keys to navigate | Reach the exit</p>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h2>> CIRCUIT_COMPLETE</h2>
+        <p>CIRCUITS_CLEARED: <span id="finalCircuits">0</span></p>
+        <p>TOTAL_SCORE: <span id="finalScore">0</span></p>
+        <p>TIME_ELAPSED: <span id="finalTime">0</span>s</p>
+        <button onclick="restartGame()" style="margin-top: 20px;">RESTART</button>
+        <button onclick="goHome()" style="margin-top: 20px;">EXIT</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            circuits: 0,
+            score: 0,
+            time: 0,
+            level: 1,
+            isPaused: false,
+            gameOver: false,
+            cellSize: 40
+        };
+
+        const keys = {};
+
+        const player = {
+            x: 1,
+            y: 1,
+            size: 15
+        };
+
+        let maze = [];
+        let exit = { x: 0, y: 0 };
+        let enemies = [];
+
+        function generateMaze(width, height) {
+            const maze = Array(height).fill(null).map(() => Array(width).fill(1));
+
+            function carve(x, y) {
+                maze[y][x] = 0;
+                const directions = [[0, -2], [2, 0], [0, 2], [-2, 0]].sort(() => Math.random() - 0.5);
+
+                directions.forEach(([dx, dy]) => {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx > 0 && nx < width && ny > 0 && ny < height && maze[ny][nx] === 1) {
+                        maze[y + dy / 2][x + dx / 2] = 0;
+                        carve(nx, ny);
+                    }
+                });
+            }
+
+            carve(1, 1);
+            maze[1][1] = 0;
+            return maze;
+        }
+
+        class Enemy {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = Math.random() > 0.5 ? 1 : -1;
+                this.vy = Math.random() > 0.5 ? 1 : -1;
+            }
+
+            update(maze) {
+                let nx = this.x + this.vx;
+                let ny = this.y + this.vy;
+
+                if (nx < 0 || nx >= maze[0].length || ny < 0 || ny >= maze.length || maze[ny][nx] === 1) {
+                    this.vx *= -1;
+                    this.vy *= -1;
+                } else {
+                    this.x = nx;
+                    this.y = ny;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(this.x * game.cellSize, this.y * game.cellSize, game.cellSize, game.cellSize);
+                ctx.strokeStyle = '#FF00FF';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x * game.cellSize, this.y * game.cellSize, game.cellSize, game.cellSize);
+            }
+        }
+
+        function initGame() {
+            const mazeWidth = 15;
+            const mazeHeight = 10;
+            maze = generateMaze(mazeWidth, mazeHeight);
+            player.x = 1;
+            player.y = 1;
+            exit.x = mazeWidth - 2;
+            exit.y = mazeHeight - 2;
+            maze[exit.y][exit.x] = 0;
+
+            enemies = [];
+            for (let i = 0; i < game.level; i++) {
+                let ex, ey;
+                do {
+                    ex = Math.floor(Math.random() * mazeWidth);
+                    ey = Math.floor(Math.random() * mazeHeight);
+                } while (maze[ey][ex] === 1 || (ex === player.x && ey === player.y));
+                enemies.push(new Enemy(ex, ey));
+            }
+
+            game.circuits = 0;
+            game.score = 0;
+            game.time = 0;
+            game.level = 1;
+            game.isPaused = false;
+            game.gameOver = false;
+        }
+
+        function update() {
+            if (game.gameOver || game.isPaused) return;
+
+            game.time++;
+
+            let nx = player.x;
+            let ny = player.y;
+
+            if (keys['ArrowUp'] && maze[player.y - 1]?.[player.x] === 0) ny--;
+            if (keys['ArrowDown'] && maze[player.y + 1]?.[player.x] === 0) ny++;
+            if (keys['ArrowLeft'] && maze[player.y]?.[player.x - 1] === 0) nx--;
+            if (keys['ArrowRight'] && maze[player.y]?.[player.x + 1] === 0) nx++;
+
+            player.x = nx;
+            player.y = ny;
+
+            enemies.forEach(enemy => {
+                enemy.update(maze);
+
+                if (enemy.x === player.x && enemy.y === player.y) {
+                    endGame();
+                }
+            });
+
+            if (player.x === exit.x && player.y === exit.y) {
+                game.circuits++;
+                game.level++;
+                game.score += 500 + game.time * 2;
+                game.time = 0;
+                initGame();
+            }
+
+            updateUI();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < maze.length; y++) {
+                for (let x = 0; x < maze[0].length; x++) {
+                    if (maze[y][x] === 1) {
+                        ctx.fillStyle = '#00FFFF';
+                        ctx.fillRect(x * game.cellSize, y * game.cellSize, game.cellSize, game.cellSize);
+                    }
+                }
+            }
+
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(exit.x * game.cellSize, exit.y * game.cellSize, game.cellSize, game.cellSize);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 14px Courier New';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('E', exit.x * game.cellSize + game.cellSize / 2, exit.y * game.cellSize + game.cellSize / 2);
+
+            ctx.fillStyle = '#00FFFF';
+            ctx.fillRect(player.x * game.cellSize + (game.cellSize - player.size) / 2,
+                         player.y * game.cellSize + (game.cellSize - player.size) / 2,
+                         player.size, player.size);
+
+            enemies.forEach(enemy => enemy.draw());
+
+            ctx.fillStyle = '#00FFFF';
+            ctx.font = 'bold 11px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText('>> CIRCUIT_NAVIGATION', 10, 25);
+        }
+
+        function updateUI() {
+            document.getElementById('circuits').textContent = game.circuits;
+            document.getElementById('score').textContent = game.score;
+            document.getElementById('time').textContent = game.time;
+            document.getElementById('level').textContent = game.level;
+        }
+
+        function endGame() {
+            game.gameOver = true;
+            document.getElementById('finalCircuits').textContent = game.circuits;
+            document.getElementById('finalScore').textContent = game.score;
+            document.getElementById('finalTime').textContent = game.time;
+            document.getElementById('gameOverScreen').style.display = 'block';
+            saveScore();
+        }
+
+        function togglePause() {
+            game.isPaused = !game.isPaused;
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            initGame();
+        }
+
+        function goHome() {
+            window.location.href = '/90s-games/';
+        }
+
+        function saveScore() {
+            let scores = JSON.parse(localStorage.getItem('digitalMazeScores') || '[]');
+            scores.push({
+                score: game.score,
+                circuits: game.circuits,
+                level: game.level,
+                date: new Date().toISOString()
+            });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('digitalMazeScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

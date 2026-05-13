@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPACE MAZE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #0ea5e9;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
+        }
+        .info {
+            color: #0ea5e9;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(14, 165, 233, 0.1);
+            border: 2px solid #0ea5e9;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #0ea5e9;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(14, 165, 233, 0.1);
+            border: 2px solid #0ea5e9;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Time</div>
+                <div class="stat-value" id="time">60</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Exits Found</div>
+                <div class="stat-value" id="exits">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                ↑ ↓ ← → Move<br/>
+                Find all exits<br/>
+                Beat the timer!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.reset()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 600,
+            height: 600,
+            gridSize: 30,
+
+            player: { x: 1, y: 1, size: 1 },
+            maze: [],
+            exits: [],
+            visited: [],
+            timeRemaining: 60,
+            initialTime: 60,
+            exitsFound: 0,
+            best: localStorage.getItem('spaceMazeBest') || 0,
+            gameRunning: false,
+            gamePaused: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.generateMaze();
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            generateMaze() {
+                const cols = this.width / this.gridSize;
+                const rows = this.height / this.gridSize;
+
+                this.maze = Array(rows).fill(null).map(() => Array(cols).fill(0));
+                this.exits = [];
+                this.visited = Array(rows).fill(null).map(() => Array(cols).fill(false));
+                this.exitsFound = 0;
+
+                // Create maze with recursive backtracking
+                this.carvePath(1, 1);
+
+                // Add exits randomly
+                for (let i = 0; i < 3; i++) {
+                    let x, y;
+                    do {
+                        x = Math.floor(Math.random() * cols);
+                        y = Math.floor(Math.random() * rows);
+                    } while (this.maze[y][x] === 1 || this.exits.some(e => e.x === x && e.y === y));
+
+                    this.exits.push({ x, y, found: false });
+                }
+
+                this.player.x = 1;
+                this.player.y = 1;
+            },
+
+            carvePath(x, y) {
+                this.maze[y] = this.maze[y] || [];
+                this.maze[y][x] = 1;
+
+                const directions = [
+                    [0, -2], [2, 0], [0, 2], [-2, 0]
+                ].sort(() => Math.random() - 0.5);
+
+                for (let [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+
+                    if (nx > 0 && nx < this.width / this.gridSize - 1 &&
+                        ny > 0 && ny < this.height / this.gridSize - 1 &&
+                        this.maze[ny][nx] !== 1) {
+
+                        this.maze[y + dy / 2][x + dx / 2] = 1;
+                        this.carvePath(nx, ny);
+                    }
+                }
+            },
+
+            start() {
+                if (!this.gameRunning) {
+                    this.gameRunning = true;
+                    this.timeRemaining = this.initialTime;
+                    const interval = setInterval(() => {
+                        if (this.gameRunning && !this.gamePaused) {
+                            this.timeRemaining--;
+                            if (this.timeRemaining <= 0) {
+                                this.gameRunning = false;
+                                clearInterval(interval);
+                            }
+                        }
+                    }, 1000);
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key] = true;
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key] = false;
+                });
+
+                // Check exits
+                for (let exit of this.exits) {
+                    if (!exit.found && this.player.x === exit.x && this.player.y === exit.y) {
+                        exit.found = true;
+                        this.exitsFound++;
+                        if (this.exitsFound === 3) {
+                            this.gameRunning = false;
+                            if (this.initialTime - this.timeRemaining < parseInt(this.best) || !this.best) {
+                                this.best = this.initialTime - this.timeRemaining;
+                                localStorage.setItem('spaceMazeBest', this.best);
+                            }
+                        }
+                    }
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw maze
+                this.ctx.fillStyle = '#0ea5e9';
+                for (let y = 0; y < this.maze.length; y++) {
+                    for (let x = 0; x < this.maze[y].length; x++) {
+                        if (this.maze[y][x] === 1) {
+                            this.ctx.fillRect(x * this.gridSize, y * this.gridSize, this.gridSize, this.gridSize);
+                        }
+                    }
+                }
+
+                // Draw exits
+                this.ctx.fillStyle = '#22c55e';
+                for (let exit of this.exits) {
+                    if (!exit.found) {
+                        this.ctx.fillStyle = '#22c55e';
+                    } else {
+                        this.ctx.fillStyle = '#9333ea';
+                    }
+                    this.ctx.fillRect(exit.x * this.gridSize + 5, exit.y * this.gridSize + 5,
+                        this.gridSize - 10, this.gridSize - 10);
+                }
+
+                // Draw player
+                this.ctx.fillStyle = '#ff0000';
+                this.ctx.beginPath();
+                this.ctx.arc(
+                    this.player.x * this.gridSize + this.gridSize / 2,
+                    this.player.y * this.gridSize + this.gridSize / 2,
+                    this.gridSize / 3,
+                    0,
+                    Math.PI * 2
+                );
+                this.ctx.fill();
+
+                // HUD
+                this.ctx.fillStyle = '#0ea5e9';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.fillText(`Time: ${Math.max(0, this.timeRemaining)}`, 10, 25);
+
+                document.getElementById('time').textContent = Math.max(0, this.timeRemaining);
+                document.getElementById('exits').textContent = this.exitsFound;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowUp' && this.maze[this.player.y - 1] && this.maze[this.player.y - 1][this.player.x]) {
+                        this.player.y--;
+                    }
+                    if (e.key === 'ArrowDown' && this.maze[this.player.y + 1] && this.maze[this.player.y + 1][this.player.x]) {
+                        this.player.y++;
+                    }
+                    if (e.key === 'ArrowLeft' && this.maze[this.player.y][this.player.x - 1]) {
+                        this.player.x--;
+                    }
+                    if (e.key === 'ArrowRight' && this.maze[this.player.y][this.player.x + 1]) {
+                        this.player.x++;
+                    }
+                });
+            },
+
+            reset() {
+                this.generateMaze();
+                this.gameRunning = false;
+                this.timeRemaining = this.initialTime;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

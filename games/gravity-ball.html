@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRAVITY BALL - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00d4ff;
+            background: radial-gradient(circle, #0a0e27 0%, #0a0a1a 100%);
+            display: block;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.4);
+        }
+        .info {
+            color: #00d4ff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(0, 212, 255, 0.1);
+            border: 2px solid #00d4ff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(0, 212, 255, 0.1);
+            border: 2px solid #00d4ff;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="600"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Gravity</div>
+                <div class="stat-value" id="gravity">1.0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                MOUSE Move ball<br/>
+                Navigate gravity field<br/>
+                Avoid black holes!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 600,
+
+            ball: { x: 250, y: 300, vx: 0, vy: 0, radius: 8, mass: 1 },
+            gravity: 0.5,
+            gravityWells: [],
+            blackHoles: [],
+            collectibles: [],
+            score: 0,
+            best: localStorage.getItem('gravityBallBest') || 0,
+            gameRunning: false,
+            gameOver: false,
+            mouseX: 250,
+            mouseY: 300,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.generateWells();
+                this.gameLoop();
+            },
+
+            generateWells() {
+                this.gravityWells = [];
+                this.blackHoles = [];
+                this.collectibles = [];
+
+                // Create gravity wells
+                for (let i = 0; i < 3; i++) {
+                    this.gravityWells.push({
+                        x: Math.random() * (this.width - 100) + 50,
+                        y: Math.random() * (this.height - 100) + 50,
+                        strength: 2 + Math.random(),
+                        radius: 30 + Math.random() * 20
+                    });
+                }
+
+                // Create black holes (obstacles)
+                for (let i = 0; i < 2; i++) {
+                    this.blackHoles.push({
+                        x: Math.random() * (this.width - 100) + 50,
+                        y: Math.random() * (this.height - 100) + 50,
+                        radius: 25
+                    });
+                }
+
+                // Create collectibles
+                for (let i = 0; i < 5; i++) {
+                    this.collectibles.push({
+                        x: Math.random() * (this.width - 40) + 20,
+                        y: Math.random() * (this.height - 40) + 20,
+                        collected: false,
+                        value: 10
+                    });
+                }
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Apply gravity from wells
+                for (let well of this.gravityWells) {
+                    const dx = well.x - this.ball.x;
+                    const dy = well.y - this.ball.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist > 0) {
+                        const force = well.strength / (dist * dist);
+                        this.ball.vx += (dx / dist) * force;
+                        this.ball.vy += (dy / dist) * force;
+                    }
+                }
+
+                // Global gravity
+                this.ball.vy += this.gravity * 0.1;
+
+                // Friction
+                this.ball.vx *= 0.98;
+                this.ball.vy *= 0.98;
+
+                // Move ball toward mouse
+                const dx = this.mouseX - this.ball.x;
+                const dy = this.mouseY - this.ball.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist > 10) {
+                    const pull = 0.3;
+                    this.ball.vx += (dx / dist) * pull;
+                    this.ball.vy += (dy / dist) * pull;
+                }
+
+                // Update position
+                this.ball.x += this.ball.vx;
+                this.ball.y += this.ball.vy;
+
+                // Wall collisions
+                if (this.ball.x - this.ball.radius < 0 || this.ball.x + this.ball.radius > this.width) {
+                    this.ball.vx = -this.ball.vx * 0.8;
+                    this.ball.x = Math.max(this.ball.radius, Math.min(this.width - this.ball.radius, this.ball.x));
+                }
+                if (this.ball.y - this.ball.radius < 0 || this.ball.y + this.ball.radius > this.height) {
+                    this.ball.vy = -this.ball.vy * 0.8;
+                    this.ball.y = Math.max(this.ball.radius, Math.min(this.height - this.ball.radius, this.ball.y));
+                }
+
+                // Check black hole collisions
+                for (let hole of this.blackHoles) {
+                    const dist = Math.hypot(this.ball.x - hole.x, this.ball.y - hole.y);
+                    if (dist < hole.radius + this.ball.radius) {
+                        this.gameOver = true;
+                        this.gameRunning = false;
+                        if (this.score > this.best) {
+                            this.best = this.score;
+                            localStorage.setItem('gravityBallBest', this.best);
+                        }
+                    }
+                }
+
+                // Check collectible collisions
+                for (let item of this.collectibles) {
+                    if (!item.collected) {
+                        const dist = Math.hypot(this.ball.x - item.x, this.ball.y - item.y);
+                        if (dist < this.ball.radius + 10) {
+                            item.collected = true;
+                            this.score += item.value;
+                        }
+                    }
+                }
+            },
+
+            draw() {
+                const gradient = this.ctx.createRadialGradient(this.width / 2, this.height / 2, 0, this.width / 2, this.height / 2, this.width);
+                gradient.addColorStop(0, '#1a2a3e');
+                gradient.addColorStop(1, '#0a0a1a');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw gravity wells
+                for (let well of this.gravityWells) {
+                    const grad = this.ctx.createRadialGradient(well.x, well.y, 0, well.x, well.y, well.radius);
+                    grad.addColorStop(0, 'rgba(0, 255, 0, 0.3)');
+                    grad.addColorStop(1, 'rgba(0, 255, 0, 0)');
+                    this.ctx.fillStyle = grad;
+                    this.ctx.fillRect(well.x - well.radius, well.y - well.radius, well.radius * 2, well.radius * 2);
+
+                    this.ctx.strokeStyle = '#00ff00';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+                    this.ctx.arc(well.x, well.y, well.radius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                }
+
+                // Draw black holes
+                for (let hole of this.blackHoles) {
+                    this.ctx.fillStyle = '#000';
+                    this.ctx.beginPath();
+                    this.ctx.arc(hole.x, hole.y, hole.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    this.ctx.strokeStyle = '#ff0000';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw collectibles
+                for (let item of this.collectibles) {
+                    if (!item.collected) {
+                        this.ctx.fillStyle = '#ffff00';
+                        this.ctx.beginPath();
+                        this.ctx.arc(item.x, item.y, 6, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                }
+
+                // Draw ball
+                this.ctx.fillStyle = '#00d4ff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // HUD
+                this.ctx.fillStyle = '#00d4ff';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00d4ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('BLACK HOLE!', this.width / 2, this.height / 2);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 40);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = e.clientX - rect.left;
+                    this.mouseY = e.clientY - rect.top;
+                });
+            },
+
+            restart() {
+                this.ball = { x: 250, y: 300, vx: 0, vy: 0, radius: 8, mass: 1 };
+                this.score = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.generateWells();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRYSTAL DASH - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #2d1b4e 0%, #1a0033 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff66ff;
+            background: #1a1a2e;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 102, 255, 0.6);
+        }
+        .info {
+            color: #ff66ff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 102, 255, 0.1);
+            border: 2px solid #ff66ff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ff66ff;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 102, 255, 0.1);
+            border: 2px solid #ff66ff;
+            padding: 12px;
+            font-size: 10px;
+            border-radius: 4px;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                LEFT/RIGHT Move<br/>
+                Collect crystals<br/>
+                Avoid enemies!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 500,
+            height: 500,
+
+            player: { x: 225, y: 450, w: 50, h: 30, speed: 6 },
+            crystals: [],
+            enemies: [],
+            score: 0,
+            level: 1,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('crystalDashBest') || 0,
+            frameCount: 0,
+            crystalCount: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            setupInput() {
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key] = true;
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key] = false;
+                });
+                this.keys = keys;
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.spawnCrystals();
+                    this.spawnEnemies();
+                }
+            },
+
+            spawnCrystals() {
+                this.crystals = [];
+                const count = 5 + this.level;
+                for (let i = 0; i < count; i++) {
+                    this.crystals.push({
+                        x: Math.random() * (this.width - 30) + 15,
+                        y: Math.random() * (this.height - 100) + 10,
+                        size: 8,
+                        color: `hsl(${Math.random() * 60 + 280}, 100%, 60%)`,
+                        collected: false
+                    });
+                }
+                this.crystalCount = count;
+            },
+
+            spawnEnemies() {
+                this.enemies = [];
+                const count = 2 + this.level;
+                for (let i = 0; i < count; i++) {
+                    this.enemies.push({
+                        x: Math.random() * (this.width - 30) + 15,
+                        y: Math.random() * (this.height / 2) + 50,
+                        w: 25,
+                        h: 25,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        color: `hsl(${Math.random() * 60 + 0}, 100%, 50%)`
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Player movement
+                if (this.keys['ArrowLeft']) this.player.x = Math.max(0, this.player.x - this.player.speed);
+                if (this.keys['ArrowRight']) this.player.x = Math.min(this.width - this.player.w, this.player.x + this.player.speed);
+
+                // Update crystals
+                for (let i = this.crystals.length - 1; i >= 0; i--) {
+                    const c = this.crystals[i];
+                    if (c.collected) continue;
+                    if (this.player.x < c.x + 20 && this.player.x + this.player.w > c.x - 20 &&
+                        this.player.y < c.y + 20 && this.player.y + this.player.h > c.y - 20) {
+                        c.collected = true;
+                        this.score += 10 * this.level;
+                    }
+                }
+
+                // Update enemies
+                for (let e of this.enemies) {
+                    e.x += e.vx;
+                    e.y += e.vy;
+
+                    if (e.x < 0 || e.x + e.w > this.width) e.vx *= -1;
+                    if (e.y < 0 || e.y + e.h > this.height / 2) e.vy *= -1;
+
+                    // Check collision with player
+                    if (this.player.x < e.x + e.w && this.player.x + this.player.w > e.x &&
+                        this.player.y < e.y + e.h && this.player.y + this.player.h > e.y) {
+                        this.gameOver = true;
+                    }
+                }
+
+                // Check level progression
+                const collected = this.crystals.filter(c => c.collected).length;
+                if (collected === this.crystalCount) {
+                    this.level++;
+                    this.spawnCrystals();
+                    this.spawnEnemies();
+                }
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('crystalDashBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#1a1a2e';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw gradient background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, 'rgba(255, 102, 255, 0.1)');
+                gradient.addColorStop(1, 'rgba(100, 50, 150, 0.1)');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw crystals
+                for (let c of this.crystals) {
+                    if (c.collected) continue;
+                    this.ctx.fillStyle = c.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(c.x, c.y, c.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw player
+                this.ctx.fillStyle = '#ff66ff';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.w, this.player.h);
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.player.x, this.player.y, this.player.w, this.player.h);
+
+                // Draw enemies
+                for (let e of this.enemies) {
+                    this.ctx.fillStyle = e.color;
+                    this.ctx.fillRect(e.x, e.y, e.w, e.h);
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(e.x, e.y, e.w, e.h);
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff66ff';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`LEVEL: ${this.level}`, 10, 25);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 50);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff66ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            restart() {
+                this.player = { x: 225, y: 450, w: 50, h: 30, speed: 6 };
+                this.crystals = [];
+                this.enemies = [];
+                this.score = 0;
+                this.level = 1;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

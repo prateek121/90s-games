@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOID JUMPER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a0000 0%, #2d0000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff3333;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 51, 51, 0.6);
+        }
+        .info {
+            color: #ff3333;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 51, 51, 0.1);
+            border: 2px solid #ff3333;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ff3333;
+            color: #000;
+            border: 2px solid #ff3333;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 51, 51, 0.8); }
+        .controls {
+            background: rgba(255, 51, 51, 0.1);
+            border: 2px solid #ff3333;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Height</div>
+                <div class="stat-value" id="height">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                LEFT/RIGHT Move<br/>
+                Jump on platforms<br/>
+                Reach the top!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            player: { x: 175, y: 500, w: 30, h: 30, vx: 0, vy: 0, speed: 5, jumping: false },
+            platforms: [],
+            enemies: [],
+            score: 0,
+            maxHeight: 0,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('voidJumperBest') || 0,
+            cameraY: 0,
+            gravity: 0.6,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.generatePlatforms();
+                this.gameLoop();
+            },
+
+            setupInput() {
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key] = true;
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key] = false;
+                });
+                this.keys = keys;
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            generatePlatforms() {
+                this.platforms = [];
+                for (let i = 0; i < 40; i++) {
+                    this.platforms.push({
+                        x: Math.random() * (this.width - 60),
+                        y: this.height - i * 120 - 100,
+                        w: 60,
+                        h: 15,
+                        color: `hsl(${Math.random() * 60 + 0}, 100%, 50%)`
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Player movement
+                this.player.vx = 0;
+                if (this.keys['ArrowLeft']) this.player.vx = -this.player.speed;
+                if (this.keys['ArrowRight']) this.player.vx = this.player.speed;
+                this.player.x += this.player.vx;
+
+                // Wrap around screen
+                if (this.player.x + this.player.w < 0) this.player.x = this.width;
+                if (this.player.x > this.width) this.player.x = -this.player.w;
+
+                // Gravity
+                this.player.vy += this.gravity;
+                this.player.y += this.player.vy;
+
+                // Platform collision
+                for (let p of this.platforms) {
+                    if (this.player.vy > 0 &&
+                        this.player.y + this.player.h >= p.y &&
+                        this.player.y + this.player.h <= p.y + 20 &&
+                        this.player.x + this.player.w > p.x &&
+                        this.player.x < p.x + p.w) {
+                        this.player.vy = -12;
+                        this.score += 10;
+                    }
+                }
+
+                // Update camera
+                const targetCameraY = Math.max(0, this.player.y - this.height / 3);
+                this.cameraY = targetCameraY;
+
+                // Check height reached
+                const heightReached = this.height - this.player.y;
+                if (heightReached > this.maxHeight) {
+                    this.maxHeight = heightReached;
+                }
+
+                // Game over conditions
+                if (this.player.y > this.height + 100) {
+                    this.gameOver = true;
+                }
+
+                if (this.maxHeight > this.best) {
+                    this.best = this.maxHeight;
+                    localStorage.setItem('voidJumperBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw gradient
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, 'rgba(255, 51, 51, 0.1)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw platforms
+                for (let p of this.platforms) {
+                    const screenY = p.y - this.cameraY;
+                    if (screenY < -100 || screenY > this.height + 100) continue;
+
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.fillRect(p.x, screenY, p.w, p.h);
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(p.x, screenY, p.w, p.h);
+                }
+
+                // Draw player
+                const playerScreenY = this.player.y - this.cameraY;
+                this.ctx.fillStyle = '#ff3333';
+                this.ctx.fillRect(this.player.x, playerScreenY, this.player.w, this.player.h);
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.player.x, playerScreenY, this.player.w, this.player.h);
+
+                // HUD
+                this.ctx.fillStyle = '#ff3333';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`HEIGHT: ${Math.floor(this.maxHeight)}`, 10, 25);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 50);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff3333';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('FELL!', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('height').textContent = Math.floor(this.maxHeight);
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = Math.floor(this.best);
+            },
+
+            restart() {
+                this.player = { x: 175, y: 500, w: 30, h: 30, vx: 0, vy: 0, speed: 5, jumping: false };
+                this.generatePlatforms();
+                this.score = 0;
+                this.maxHeight = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.cameraY = 0;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

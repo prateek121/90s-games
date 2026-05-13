@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RHYTHM TAP - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #2d1b69 0%, #1a0033 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff00ff;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+        }
+        .info {
+            color: #ff00ff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ff00ff;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Combo</div>
+                <div class="stat-value" id="combo">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Accuracy</div>
+                <div class="stat-value" id="accuracy">0%</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                A/D/J/K Tap lanes<br/>
+                Hit notes in time<br/>
+                Build combos!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            notes: [],
+            lanes: [80, 160, 240, 320],
+            laneWidth: 60,
+            hitZone: { y: 500, height: 100 },
+
+            score: 0,
+            combo: 0,
+            hits: 0,
+            misses: 0,
+            gameRunning: false,
+            gameOver: false,
+            noteSpeed: 4,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.spawnPattern();
+                }
+            },
+
+            spawnPattern() {
+                const patterns = [
+                    [0, 1, 2, 3, 0, 1, 2, 3],
+                    [0, 2, 1, 3, 0, 2, 1, 3],
+                    [0, 1, 0, 1, 2, 3, 2, 3],
+                    [1, 2, 3, 0, 3, 2, 1, 0]
+                ];
+
+                const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+                let spawnTime = 0;
+
+                for (let laneIndex of pattern) {
+                    setTimeout(() => {
+                        if (this.gameRunning) {
+                            this.notes.push({
+                                lane: laneIndex,
+                                y: -50,
+                                hit: false,
+                                spawnTime: Date.now()
+                            });
+                        }
+                    }, spawnTime);
+                    spawnTime += 300;  // 300ms between notes
+                }
+
+                if (this.gameRunning) {
+                    setTimeout(() => this.spawnPattern(), spawnTime + 500);
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Update notes
+                for (let i = this.notes.length - 1; i >= 0; i--) {
+                    const note = this.notes[i];
+                    note.y += this.noteSpeed;
+
+                    // Missed note
+                    if (note.y > this.height && !note.hit) {
+                        this.notes.splice(i, 1);
+                        this.combo = 0;
+                        this.misses++;
+                    }
+                }
+            },
+
+            hitNote(laneIndex) {
+                let hitNote = null;
+                let closestDistance = Infinity;
+
+                for (let note of this.notes) {
+                    if (note.lane === laneIndex && !note.hit) {
+                        const distance = Math.abs(note.y - (this.hitZone.y + this.hitZone.height / 2));
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            hitNote = note;
+                        }
+                    }
+                }
+
+                if (hitNote && closestDistance < 100) {
+                    hitNote.hit = true;
+                    this.notes = this.notes.filter(n => n !== hitNote);
+
+                    const accuracy = Math.max(0, 100 - closestDistance);
+                    this.score += Math.round(accuracy);
+                    this.combo++;
+                    this.hits++;
+
+                    if (this.combo % 10 === 0) {
+                        this.score += 100;  // Combo bonus
+                    }
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw lanes
+                for (let i = 0; i < 4; i++) {
+                    this.ctx.fillStyle = 'rgba(255, 0, 255, 0.1)';
+                    this.ctx.fillRect(this.lanes[i] - this.laneWidth / 2, 0, this.laneWidth, this.height);
+
+                    this.ctx.strokeStyle = '#ff00ff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(this.lanes[i] - this.laneWidth / 2, 0, this.laneWidth, this.height);
+                }
+
+                // Draw hit zone
+                this.ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+                this.ctx.fillRect(0, this.hitZone.y, this.width, this.hitZone.height);
+
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 3;
+                this.ctx.strokeRect(0, this.hitZone.y, this.width, this.hitZone.height);
+
+                // Draw notes
+                for (let note of this.notes) {
+                    this.ctx.fillStyle = '#ff00ff';
+                    const x = this.lanes[note.lane] - 20;
+                    const y = note.y;
+                    this.ctx.fillRect(x, y, 40, 40);
+
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 12px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(`${note.lane + 1}`, x + 20, y + 25);
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+                this.ctx.fillText(`Combo: ${this.combo}`, 10, 50);
+
+                const accuracy = this.hits + this.misses > 0
+                    ? Math.round((this.hits / (this.hits + this.misses)) * 100)
+                    : 0;
+                this.ctx.fillText(`Accuracy: ${accuracy}%`, 10, 75);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff00ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('SONG COMPLETE', this.width / 2, this.height / 2);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Score: ${this.score}`, this.width / 2, this.height / 2 + 40);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('combo').textContent = this.combo;
+                document.getElementById('accuracy').textContent = accuracy + '%';
+            },
+
+            setupInput() {
+                const keyMap = {
+                    'a': 0,
+                    'd': 1,
+                    'j': 2,
+                    'k': 3
+                };
+
+                document.addEventListener('keydown', (e) => {
+                    const laneIndex = keyMap[e.key.toLowerCase()];
+                    if (laneIndex !== undefined && this.gameRunning) {
+                        this.hitNote(laneIndex);
+                    }
+                    if (e.key === ' ' && !this.gameRunning) {
+                        this.start();
+                    }
+                });
+            },
+
+            restart() {
+                this.notes = [];
+                this.score = 0;
+                this.combo = 0;
+                this.hits = 0;
+                this.misses = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

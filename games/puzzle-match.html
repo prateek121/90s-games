@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUZZLE MATCH - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            grid-template-rows: repeat(5, 60px);
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .tile {
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        .tile:hover {
+            transform: scale(1.05);
+            border-color: #fff;
+        }
+        .tile.matched {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            animation: matchPulse 0.6s;
+        }
+        .tile.selected {
+            border-color: #ffff00;
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.8);
+        }
+        @keyframes matchPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(0.8); opacity: 0; }
+        }
+        .info {
+            color: white;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: white;
+            color: #667eea;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid white;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-board" id="gameBoard"></div>
+    <div class="info">
+        <div class="stat-box">
+            <div class="stat-label">Score</div>
+            <div class="stat-value" id="score">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Moves</div>
+            <div class="stat-value" id="moves">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Matches</div>
+            <div class="stat-value" id="matches">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Best Score</div>
+            <div class="stat-value" id="best">0</div>
+        </div>
+        <div class="controls">
+            <strong>RULES:</strong><br/>
+            Match 3+ tiles<br/>
+            Same color/symbol<br/>
+            Horizontal or vertical<br/>
+            Clear board to win!
+        </div>
+        <button onclick="game.reset()">NEW GAME</button>
+        <button onclick="location.href='../'">BACK</button>
+    </div>
+
+    <script>
+        const game = {
+            board: [],
+            selectedTiles: [],
+            score: 0,
+            moves: 0,
+            matches: 0,
+            best: localStorage.getItem('puzzleMatchBest') || 0,
+            boardWidth: 5,
+            boardHeight: 5,
+            symbols: ['🔴', '🔵', '🟡', '🟢', '🟣'],
+            gameActive: true,
+
+            init() {
+                this.generateBoard();
+                this.render();
+            },
+
+            generateBoard() {
+                this.board = [];
+                for (let i = 0; i < this.boardHeight; i++) {
+                    this.board[i] = [];
+                    for (let j = 0; j < this.boardWidth; j++) {
+                        this.board[i][j] = {
+                            symbol: this.symbols[Math.floor(Math.random() * this.symbols.length)],
+                            matched: false
+                        };
+                    }
+                }
+            },
+
+            selectTile(row, col) {
+                if (!this.gameActive) return;
+
+                const tile = this.board[row][col];
+                if (tile.matched) return;
+
+                const key = `${row}-${col}`;
+                const isSelected = this.selectedTiles.some(t => t.key === key);
+
+                if (isSelected) {
+                    this.selectedTiles = this.selectedTiles.filter(t => t.key !== key);
+                } else {
+                    this.selectedTiles.push({ row, col, key, symbol: tile.symbol });
+                }
+
+                if (this.selectedTiles.length === 3) {
+                    this.checkMatch();
+                    this.moves++;
+                }
+
+                this.render();
+            },
+
+            checkMatch() {
+                const tiles = this.selectedTiles;
+
+                if (!tiles.every(t => t.symbol === tiles[0].symbol)) {
+                    this.selectedTiles = [];
+                    return;
+                }
+
+                // Check if horizontal
+                const sameRow = tiles.every(t => t.row === tiles[0].row);
+                const sameCols = tiles.map(t => t.col).sort((a, b) => a - b);
+                const consecutiveCols = sameCols.every((col, i, arr) => i === 0 || col === arr[i-1] + 1);
+
+                // Check if vertical
+                const sameCol = tiles.every(t => t.col === tiles[0].col);
+                const sameRows = tiles.map(t => t.row).sort((a, b) => a - b);
+                const consecutiveRows = sameRows.every((row, i, arr) => i === 0 || row === arr[i-1] + 1);
+
+                if ((sameRow && consecutiveCols) || (sameCol && consecutiveRows)) {
+                    tiles.forEach(t => {
+                        this.board[t.row][t.col].matched = true;
+                    });
+                    this.score += 100 + (this.matches * 10);
+                    this.matches++;
+
+                    if (this.checkWin()) {
+                        this.gameActive = false;
+                        if (this.score > this.best) {
+                            this.best = this.score;
+                            localStorage.setItem('puzzleMatchBest', this.best);
+                        }
+                    }
+                }
+
+                this.selectedTiles = [];
+            },
+
+            checkWin() {
+                return this.board.every(row => row.every(tile => tile.matched));
+            },
+
+            reset() {
+                this.board = [];
+                this.selectedTiles = [];
+                this.score = 0;
+                this.moves = 0;
+                this.matches = 0;
+                this.gameActive = true;
+                this.generateBoard();
+                this.render();
+            },
+
+            render() {
+                const boardEl = document.getElementById('gameBoard');
+                boardEl.innerHTML = '';
+
+                for (let i = 0; i < this.boardHeight; i++) {
+                    for (let j = 0; j < this.boardWidth; j++) {
+                        const tile = this.board[i][j];
+                        const tileEl = document.createElement('div');
+                        tileEl.className = 'tile';
+                        tileEl.textContent = tile.symbol;
+
+                        if (tile.matched) {
+                            tileEl.classList.add('matched');
+                            tileEl.style.opacity = '0';
+                            tileEl.style.pointerEvents = 'none';
+                        }
+
+                        const isSelected = this.selectedTiles.some(t => t.row === i && t.col === j);
+                        if (isSelected) {
+                            tileEl.classList.add('selected');
+                        }
+
+                        tileEl.onclick = () => this.selectTile(i, j);
+                        boardEl.appendChild(tileEl);
+                    }
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('moves').textContent = this.moves;
+                document.getElementById('matches').textContent = this.matches;
+                document.getElementById('best').textContent = this.best;
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

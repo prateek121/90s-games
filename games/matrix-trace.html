@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MATRIX TRACE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ff00;
+            background: #000;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+        .info {
+            color: #00ff00;
+            margin-top: 20px;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ff00;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ff00;
+            color: #000;
+            border: none;
+            border-radius: 0;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+        button:hover { box-shadow: 0 0 10px rgba(0, 255, 0, 0.8); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #00ff00; text-shadow: 0 0 10px rgba(0, 255, 0, 0.7);">[ MATRIX TRACE ]</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div style="margin: 10px 0;">Speed: <span id="level">1</span> | High: <span id="highScore">0</span></div>
+            <p style="margin: 10px 0;">Click/Drag to draw lines • Complete the path</p>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            currentPath: [],
+            targetPath: [],
+            score: 0,
+            level: 1,
+            highScore: localStorage.getItem('matrixTraceHigh') || 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            pathCompleteTimer: 0,
+            isDrawing: false,
+            gridSize: 50,
+            mistakes: 0,
+            maxMistakes: 3,
+            timeLimit: 300,
+            timeLeft: 300,
+            speedBoost: 1,
+            particles: [],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+                document.getElementById('highScore').textContent = this.highScore;
+            },
+
+            startGame() {
+                this.currentPath = [];
+                this.targetPath = this.generateTargetPath();
+                this.score = 0;
+                this.level = 1;
+                this.mistakes = 0;
+                this.timeLimit = 300;
+                this.timeLeft = 300;
+                this.speedBoost = 1;
+                this.particles = [];
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.pathCompleteTimer = 0;
+            },
+
+            generateTargetPath() {
+                const path = [];
+                let x = 50;
+                let y = 100;
+                const maxSteps = 5 + this.level;
+                const visited = new Set();
+
+                for (let i = 0; i < maxSteps; i++) {
+                    const key = `${x},${y}`;
+                    if (!visited.has(key)) {
+                        path.push({ x, y });
+                        visited.add(key);
+                    }
+
+                    // Smart pathfinding that prevents backtracking
+                    let direction = Math.floor(Math.random() * 4);
+                    let attempts = 0;
+                    while (attempts < 4) {
+                        if (direction === 0 && x < this.width - this.gridSize) {
+                            x += this.gridSize;
+                            break;
+                        } else if (direction === 1 && x > this.gridSize) {
+                            x -= this.gridSize;
+                            break;
+                        } else if (direction === 2 && y < this.height - this.gridSize) {
+                            y += this.gridSize;
+                            break;
+                        } else if (direction === 3 && y > this.gridSize) {
+                            y -= this.gridSize;
+                            break;
+                        }
+                        direction = (direction + 1) % 4;
+                        attempts++;
+                    }
+                }
+                return path;
+            },
+
+            snapToGrid(x, y) {
+                return {
+                    x: Math.round(x / this.gridSize) * this.gridSize,
+                    y: Math.round(y / this.gridSize) * this.gridSize
+                };
+            },
+
+            addPathPoint(x, y) {
+                const snapped = this.snapToGrid(x, y);
+                if (this.currentPath.length === 0 ||
+                    this.currentPath[this.currentPath.length - 1].x !== snapped.x ||
+                    this.currentPath[this.currentPath.length - 1].y !== snapped.y) {
+                    this.currentPath.push(snapped);
+                    this.checkProgress();
+                }
+            },
+
+            checkProgress() {
+                let match = true;
+                for (let i = 0; i < this.currentPath.length; i++) {
+                    if (!this.targetPath[i] ||
+                        this.currentPath[i].x !== this.targetPath[i].x ||
+                        this.currentPath[i].y !== this.targetPath[i].y) {
+                        match = false;
+                        this.mistakes++;
+                        this.currentPath.pop();
+                        if (this.mistakes >= this.maxMistakes) {
+                            this.endGame();
+                        }
+                        break;
+                    }
+                }
+
+                if (match && this.currentPath.length === this.targetPath.length) {
+                    this.pathCompleteTimer = 10;
+                    const speedBonus = Math.max(0, this.timeLeft);
+                    this.score += (100 * this.level) + speedBonus;
+                    this.level++;
+                    this.timeLimit = Math.max(180, this.timeLimit - 30);
+                    this.timeLeft = this.timeLimit;
+                    this.createParticles(this.targetPath[this.targetPath.length - 1].x, this.targetPath[this.targetPath.length - 1].y);
+                }
+            },
+
+            createParticles(x, y) {
+                for (let i = 0; i < 10; i++) {
+                    const angle = (i / 10) * Math.PI * 2;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        life: 20,
+                        color: '#00ff00'
+                    });
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.timeLeft--;
+                if (this.timeLeft <= 0) {
+                    this.endGame();
+                    return;
+                }
+
+                if (this.pathCompleteTimer > 0) {
+                    this.pathCompleteTimer--;
+                    if (this.pathCompleteTimer === 0) {
+                        this.currentPath = [];
+                        this.targetPath = this.generateTargetPath();
+                    }
+                }
+
+                // Particles
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life--;
+                    return p.life > 0;
+                });
+
+                this.frameCount++;
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('matrixTraceHigh', this.highScore);
+                    document.getElementById('highScore').textContent = this.highScore;
+                }
+            },
+
+            draw() {
+                // Background with matrix effect
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Grid
+                this.ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+                this.ctx.lineWidth = 1;
+                for (let x = 0; x < this.width; x += this.gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.height);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y < this.height; y += this.gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.width, y);
+                    this.ctx.stroke();
+                }
+
+                // Target path
+                this.ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                for (let i = 0; i < this.targetPath.length; i++) {
+                    const p = this.targetPath[i];
+                    if (i === 0) this.ctx.moveTo(p.x, p.y);
+                    else this.ctx.lineTo(p.x, p.y);
+                }
+                this.ctx.stroke();
+
+                // Target points
+                this.ctx.fillStyle = '#00ff00';
+                for (let p of this.targetPath) {
+                    this.ctx.fillRect(p.x - 4, p.y - 4, 8, 8);
+                }
+
+                // Current path
+                this.ctx.strokeStyle = '#ffff00';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                for (let i = 0; i < this.currentPath.length; i++) {
+                    const p = this.currentPath[i];
+                    if (i === 0) this.ctx.moveTo(p.x, p.y);
+                    else this.ctx.lineTo(p.x, p.y);
+                }
+                this.ctx.stroke();
+
+                // Current points
+                this.ctx.fillStyle = '#ffff00';
+                for (let p of this.currentPath) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 20;
+                    this.ctx.fillRect(p.x, p.y, 2, 2);
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = '12px Courier New';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Mistakes: ${this.mistakes}/${this.maxMistakes}`, 10, this.height - 20);
+                this.ctx.fillText(`Time: ${Math.ceil(this.timeLeft / 60)}s`, this.width - 80, this.height - 20);
+
+                // Status
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = 'bold 14px Courier New';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Path: ${this.currentPath.length}/${this.targetPath.length}`, 10, 30);
+
+                if (this.pathCompleteTimer > 0) {
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 20px Courier New';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('TRACE COMPLETE!', this.width / 2, this.height / 2);
+                }
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.font = 'bold 24px Courier New';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px Courier New';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PROTOCOL TERMINATED', this.width / 2, this.height / 2 - 30);
+                    this.ctx.font = '14px Courier New';
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.fillText(`Score: ${this.score}`, this.width / 2, this.height / 2 + 10);
+                    this.ctx.fillText(`Level: ${this.level}`, this.width / 2, this.height / 2 + 30);
+                }
+            },
+
+            setupInput() {
+                this.canvas.addEventListener('mousedown', (e) => {
+                    this.isDrawing = true;
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.addPathPoint(e.clientX - rect.left, e.clientY - rect.top);
+                });
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (this.isDrawing && this.gameRunning && !this.gamePaused) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        this.addPathPoint(e.clientX - rect.left, e.clientY - rect.top);
+                    }
+                });
+                this.canvas.addEventListener('mouseup', () => {
+                    this.isDrawing = false;
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        this.togglePause();
+                    }
+                    if (e.key === 'Backspace') {
+                        e.preventDefault();
+                        if (this.currentPath.length > 0) {
+                            this.currentPath.pop();
+                        }
+                    }
+                });
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

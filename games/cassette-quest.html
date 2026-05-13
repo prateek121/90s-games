@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cassette Quest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(45deg, #330033, #660066);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            background: linear-gradient(to bottom, #000, #330033);
+            border: 4px solid #ff00ff;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5), inset 0 0 20px rgba(255, 0, 255, 0.1);
+            padding: 20px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+            margin-bottom: 10px;
+            font-size: 2em;
+            letter-spacing: 2px;
+        }
+
+        .cassette-visual {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .reel {
+            width: 30px;
+            height: 30px;
+            border: 2px solid #ff00ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #ff00ff;
+        }
+
+        .reel.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            color: #ff00ff;
+            font-size: 0.9em;
+        }
+
+        .stat {
+            background: rgba(255, 0, 255, 0.1);
+            padding: 8px;
+            border: 2px solid #ff00ff;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        canvas {
+            background: #000;
+            border: 3px solid #ff00ff;
+            display: block;
+            margin: 15px auto;
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);
+        }
+
+        .controls {
+            color: #ff00ff;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        button {
+            background: #ff00ff;
+            color: #000;
+            border: none;
+            padding: 10px 30px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #ff33ff;
+            box-shadow: 0 0 10px #ff00ff;
+        }
+
+        .message {
+            color: #00ffff;
+            font-size: 1.1em;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CASSETTE QUEST</h1>
+
+        <div class="cassette-visual">
+            <div class="reel spinning">TAPE</div>
+            <div style="color: #ff00ff;">⧐ ⧑</div>
+            <div class="reel">PLAY</div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">TRACKS</div>
+                <div class="stat-value" id="tracks">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">NOTES</div>
+                <div class="stat-value" id="notes">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">STREAK</div>
+                <div class="stat-value" id="streak">0</div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="400"></canvas>
+
+        <div class="controls">
+            <p>Press Keys: A S D F G H J K to Hit Notes</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <button id="startBtn" onclick="game.start()">PLAY TAPE</button>
+        <button onclick="location.reload()">RESET</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            running: false,
+            tracks: 0,
+            notes: 0,
+            streak: 0,
+            maxStreak: 0,
+
+            keys: {
+                'a': { x: 50, pressed: false, color: '#ff0000' },
+                's': { x: 120, pressed: false, color: '#00ff00' },
+                'd': { x: 190, pressed: false, color: '#0000ff' },
+                'f': { x: 260, pressed: false, color: '#ffff00' },
+                'g': { x: 330, pressed: false, color: '#ff00ff' },
+                'h': { x: 400, pressed: false, color: '#00ffff' }
+            },
+
+            fallingNotes: [],
+            hitNotes: [],
+            noteSpeed: 3,
+            spawnRate: 30,
+            spawnCounter: 0,
+            hitWindow: 50,
+
+            init() {
+                document.addEventListener('keydown', (e) => {
+                    const key = e.key.toLowerCase();
+                    if (this.keys[key]) {
+                        e.preventDefault();
+                        this.keys[key].pressed = true;
+                        this.checkHit(key);
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    const key = e.key.toLowerCase();
+                    if (this.keys[key]) {
+                        this.keys[key].pressed = false;
+                    }
+                });
+            },
+
+            start() {
+                this.running = true;
+                this.tracks = 0;
+                this.notes = 0;
+                this.streak = 0;
+                this.maxStreak = 0;
+                this.fallingNotes = [];
+                document.getElementById('startBtn').disabled = true;
+                this.generateSequence();
+                this.update();
+            },
+
+            generateSequence() {
+                const noteKeys = Object.keys(this.keys);
+                for (let i = 0; i < 50; i++) {
+                    const key = noteKeys[Math.floor(Math.random() * noteKeys.length)];
+                    this.fallingNotes.push({
+                        key,
+                        x: this.keys[key].x,
+                        y: -i * 60,
+                        width: 40,
+                        height: 30,
+                        hit: false
+                    });
+                }
+                this.tracks = this.fallingNotes.length;
+            },
+
+            checkHit(key) {
+                if (!this.running) return;
+
+                let hit = false;
+                for (let i = 0; i < this.fallingNotes.length; i++) {
+                    const note = this.fallingNotes[i];
+                    if (note.key === key && !note.hit) {
+                        const distance = Math.abs(note.y + note.height / 2 - 350);
+                        if (distance < this.hitWindow) {
+                            hit = true;
+                            note.hit = true;
+                            const points = Math.max(50, 100 - distance);
+                            this.notes += points;
+                            this.streak++;
+                            this.maxStreak = Math.max(this.maxStreak, this.streak);
+
+                            this.hitNotes.push({
+                                x: this.keys[key].x,
+                                y: 350,
+                                life: 20,
+                                text: '+' + points
+                            });
+
+                            this.fallingNotes.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+
+                if (!hit) {
+                    this.streak = 0;
+                }
+            },
+
+            update() {
+                if (!this.running) return;
+
+                // Spawn new notes
+                this.spawnCounter++;
+                if (this.spawnCounter >= this.spawnRate && this.fallingNotes.length < 100) {
+                    const noteKeys = Object.keys(this.keys);
+                    const key = noteKeys[Math.floor(Math.random() * noteKeys.length)];
+                    this.fallingNotes.push({
+                        key,
+                        x: this.keys[key].x,
+                        y: -100,
+                        width: 40,
+                        height: 30,
+                        hit: false
+                    });
+                    this.spawnCounter = 0;
+                }
+
+                // Move notes
+                for (let i = this.fallingNotes.length - 1; i >= 0; i--) {
+                    this.fallingNotes[i].y += this.noteSpeed;
+
+                    if (this.fallingNotes[i].y > canvas.height && !this.fallingNotes[i].hit) {
+                        this.streak = 0;
+                        this.fallingNotes.splice(i, 1);
+                    }
+                }
+
+                // Update hit effects
+                for (let i = this.hitNotes.length - 1; i >= 0; i--) {
+                    this.hitNotes[i].life--;
+                    if (this.hitNotes[i].life <= 0) {
+                        this.hitNotes.splice(i, 1);
+                    }
+                }
+
+                // Check if sequence complete
+                if (this.fallingNotes.length === 0 && this.spawnCounter > this.spawnRate) {
+                    this.running = false;
+                    document.getElementById('message').textContent = 'TRACK COMPLETE! Score: ' + this.notes + ' | Max Streak: ' + this.maxStreak;
+                    document.getElementById('startBtn').disabled = false;
+                    this.saveScore();
+                    return;
+                }
+
+                this.draw();
+                this.updateUI();
+                requestAnimationFrame(() => this.update());
+            },
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw lane separators
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 1;
+                for (const key of Object.values(this.keys)) {
+                    ctx.beginPath();
+                    ctx.moveTo(key.x + 20, 0);
+                    ctx.lineTo(key.x + 20, canvas.height);
+                    ctx.stroke();
+                }
+
+                // Draw keys
+                const keyPositions = Object.entries(this.keys);
+                for (const [keyName, key] of keyPositions) {
+                    ctx.fillStyle = key.pressed ? '#fff' : key.color;
+                    ctx.fillRect(key.x, 340, 40, 40);
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 14px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(keyName.toUpperCase(), key.x + 20, 368);
+                }
+
+                // Draw hit zone
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 340);
+                ctx.lineTo(canvas.width, 340);
+                ctx.stroke();
+
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, 340 - this.hitWindow);
+                ctx.lineTo(canvas.width, 340 - this.hitWindow);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, 340 + this.hitWindow);
+                ctx.lineTo(canvas.width, 340 + this.hitWindow);
+                ctx.stroke();
+
+                // Draw falling notes
+                for (const note of this.fallingNotes) {
+                    ctx.fillStyle = this.keys[note.key].color;
+                    ctx.fillRect(note.x, note.y, note.width, note.height);
+                }
+
+                // Draw hit effects
+                for (const hit of this.hitNotes) {
+                    ctx.fillStyle = '#00ff00';
+                    ctx.globalAlpha = hit.life / 20;
+                    ctx.font = 'bold 16px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(hit.text, hit.x + 20, hit.y);
+                    ctx.globalAlpha = 1;
+                }
+            },
+
+            updateUI() {
+                document.getElementById('tracks').textContent = this.tracks;
+                document.getElementById('notes').textContent = this.notes;
+                document.getElementById('streak').textContent = this.streak;
+            },
+
+            saveScore() {
+                let scores = JSON.parse(localStorage.getItem('cassetteScores') || '[]');
+                scores.push({ score: this.notes, streak: this.maxStreak, date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.score - a.score);
+                localStorage.setItem('cassetteScores', JSON.stringify(scores.slice(0, 10)));
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

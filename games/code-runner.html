@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Runner - 90s Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f0f23, #1a1a3f);
+            font-family: 'Courier New', monospace;
+            color: #00FF00;
+        }
+
+        .container {
+            text-align: center;
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            text-shadow: 0 0 10px #00FF00;
+            letter-spacing: 2px;
+        }
+
+        #gameCanvas {
+            border: 2px solid #00FF00;
+            background: #0f0f23;
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            text-shadow: 0 0 5px #00FF00;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 8px 15px;
+            border: 1px solid #00FF00;
+            border-radius: 3px;
+            margin: 3px;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00FF00;
+            border-radius: 3px;
+        }
+
+        button {
+            background: rgba(0, 255, 0, 0.1);
+            color: #00FF00;
+            border: 1px solid #00FF00;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            text-shadow: 0 0 5px #00FF00;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 10px #00FF00;
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border: 2px solid #00FF00;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            border-radius: 3px;
+        }
+
+        .game-over h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00FF00;
+        }
+
+        .game-over p {
+            font-size: 1em;
+            margin: 10px 0;
+            text-shadow: 0 0 5px #00FF00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>>> CODE_RUNNER.EXE</h1>
+        <div class="stats">
+            <div class="stat">BUGS_FIXED: <span id="bugs">0</span></div>
+            <div class="stat">SCORE: <span id="score">0</span></div>
+            <div class="stat">ERRORS: <span id="errors">0</span>/3</div>
+            <div class="stat">LEVEL: <span id="level">1</span></div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            <button onclick="togglePause()">PAUSE</button>
+            <button onclick="restartGame()">RESTART</button>
+            <button onclick="goHome()">EXIT</button>
+        </div>
+        <p style="margin-top: 15px; font-size: 0.85em;">Click GREEN characters to fix | Avoid RED errors</p>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h2>> DEBUG_SESSION_ENDED</h2>
+        <p>BUGS_ELIMINATED: <span id="finalBugs">0</span></p>
+        <p>FINAL_SCORE: <span id="finalScore">0</span></p>
+        <p>LEVEL_COMPLETED: <span id="finalLevel">1</span></p>
+        <button onclick="restartGame()" style="margin-top: 20px;">RESTART</button>
+        <button onclick="goHome()" style="margin-top: 20px;">EXIT</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            bugs: 0,
+            score: 0,
+            errors: 0,
+            level: 1,
+            isPaused: false,
+            gameOver: false,
+            time: 0
+        };
+
+        const characters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'];
+
+        class Bug {
+            constructor(isBad = false) {
+                this.x = Math.random() * (canvas.width - 60) + 30;
+                this.y = Math.random() * (canvas.height - 60) + 30;
+                this.char = characters[Math.floor(Math.random() * characters.length)];
+                this.isBad = isBad;
+                this.size = 20;
+                this.vx = (Math.random() - 0.5) * (3 + game.level);
+                this.vy = (Math.random() - 0.5) * (3 + game.level);
+                this.fixed = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < this.size || this.x > canvas.width - this.size) this.vx *= -1;
+                if (this.y < this.size || this.y > canvas.height - this.size) this.vy *= -1;
+
+                this.x = Math.max(this.size, Math.min(canvas.width - this.size, this.x));
+                this.y = Math.max(this.size, Math.min(canvas.height - this.size, this.y));
+            }
+
+            draw() {
+                ctx.fillStyle = this.isBad ? '#FF0000' : '#00FF00';
+                ctx.globalAlpha = this.fixed ? 0.3 : 1;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 14px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.char, this.x, this.y);
+            }
+
+            isClicked(x, y) {
+                const dx = this.x - x;
+                const dy = this.y - y;
+                return Math.sqrt(dx * dx + dy * dy) < this.size && !this.fixed;
+            }
+        }
+
+        let bugs = [];
+
+        function initGame() {
+            bugs = [];
+            game.bugs = 0;
+            game.score = 0;
+            game.errors = 0;
+            game.level = 1;
+            game.isPaused = false;
+            game.gameOver = false;
+            game.time = 0;
+
+            const bugCount = 6 + game.level * 2;
+            const badBugCount = Math.floor(bugCount / 4);
+
+            for (let i = 0; i < bugCount - badBugCount; i++) {
+                bugs.push(new Bug(false));
+            }
+            for (let i = 0; i < badBugCount; i++) {
+                bugs.push(new Bug(true));
+            }
+        }
+
+        function update() {
+            if (game.gameOver || game.isPaused) return;
+
+            game.time++;
+
+            bugs.forEach(bug => bug.update());
+
+            const fixedCount = bugs.filter(b => b.fixed && !b.isBad).length;
+            if (fixedCount > 0 && game.time % (100 - game.level * 10) === 0) {
+                if (bugs.filter(b => !b.fixed).length > 0) {
+                    bugs.push(new Bug(Math.random() < 0.3));
+                }
+            }
+
+            if (bugs.filter(b => b.fixed && !b.isBad).length >= 8 + game.level * 2) {
+                game.level++;
+                bugs = [];
+                const bugCount = 6 + game.level * 2;
+                const badBugCount = Math.floor(bugCount / 4);
+                for (let i = 0; i < bugCount - badBugCount; i++) {
+                    bugs.push(new Bug(false));
+                }
+                for (let i = 0; i < badBugCount; i++) {
+                    bugs.push(new Bug(true));
+                }
+            }
+
+            updateUI();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#0f0f23';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            bugs.forEach(bug => bug.draw());
+
+            ctx.fillStyle = '#00FF00';
+            ctx.font = 'bold 11px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText('>> DEBUG_MODE_ACTIVE', 10, 25);
+        }
+
+        function updateUI() {
+            document.getElementById('bugs').textContent = game.bugs;
+            document.getElementById('score').textContent = game.score;
+            document.getElementById('errors').textContent = game.errors;
+            document.getElementById('level').textContent = game.level;
+        }
+
+        function endGame() {
+            game.gameOver = true;
+            document.getElementById('finalBugs').textContent = game.bugs;
+            document.getElementById('finalScore').textContent = game.score;
+            document.getElementById('finalLevel').textContent = game.level;
+            document.getElementById('gameOverScreen').style.display = 'block';
+            saveScore();
+        }
+
+        function togglePause() {
+            game.isPaused = !game.isPaused;
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            initGame();
+        }
+
+        function goHome() {
+            window.location.href = '/90s-games/';
+        }
+
+        function saveScore() {
+            let scores = JSON.parse(localStorage.getItem('codeRunnerScores') || '[]');
+            scores.push({
+                score: game.score,
+                bugs: game.bugs,
+                level: game.level,
+                date: new Date().toISOString()
+            });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('codeRunnerScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (!game.gameOver && !game.isPaused) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                let hitBug = false;
+                bugs.forEach(bug => {
+                    if (bug.isClicked(x, y)) {
+                        bug.fixed = true;
+                        hitBug = true;
+
+                        if (bug.isBad) {
+                            game.errors++;
+                            if (game.errors >= 3) {
+                                endGame();
+                            }
+                        } else {
+                            game.bugs++;
+                            game.score += 100 + game.level * 25;
+                        }
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

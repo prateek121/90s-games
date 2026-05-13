@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riddle Realm - Puzzle Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #4d1a4d 0%, #1a4d4d 100%);
+            font-family: 'Georgia', serif;
+            color: #ffcc00;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+            max-width: 800px;
+        }
+
+        .header {
+            text-align: center;
+            text-shadow: 0 0 15px #ffcc00;
+            border: 3px solid #ffcc00;
+            padding: 20px 40px;
+            background: rgba(255, 204, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            font-size: 1.2em;
+        }
+
+        .stat {
+            border: 2px solid #ffcc00;
+            padding: 10px 20px;
+            background: rgba(255, 204, 0, 0.05);
+        }
+
+        .stat span {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        .riddle-box {
+            border: 3px solid #ffcc00;
+            padding: 30px;
+            background: rgba(255, 204, 0, 0.08);
+            text-align: center;
+            font-size: 1.3em;
+            line-height: 1.8;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-width: 700px;
+        }
+
+        .riddle-text {
+            font-style: italic;
+            color: #00ffff;
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+
+        .hint-text {
+            color: #ffff00;
+            font-size: 0.95em;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+
+        .answer-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .answer-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            text-align: center;
+            background: #000;
+            border: 2px solid #ffcc00;
+            color: #ffcc00;
+            font-weight: bold;
+            font-family: 'Georgia', serif;
+        }
+
+        .answer-input:focus {
+            outline: none;
+            box-shadow: 0 0 20px #ffcc00;
+        }
+
+        .answer-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            font-size: 1.1em;
+            background: linear-gradient(135deg, #ffcc00, #ffaa00);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-family: 'Georgia', serif;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .message {
+            min-height: 30px;
+            font-size: 1.3em;
+            text-shadow: 0 0 10px currentColor;
+            text-align: center;
+        }
+
+        .message.success {
+            color: #00ff00;
+        }
+
+        .message.error {
+            color: #ff4444;
+        }
+
+        .difficulty {
+            text-align: center;
+            color: #ffff00;
+            font-size: 0.95em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        small {
+            color: #ffff00;
+            opacity: 0.7;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <h1>RIDDLE REALM</h1>
+            <p style="font-size: 0.95em; opacity: 0.9;">Test your wit with mysterious riddles</p>
+        </div>
+        <div class="stats">
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Streak: <span id="streak">0</span></div>
+            <div class="stat">Riddles: <span id="riddles">1</span>/10</div>
+        </div>
+        <div class="difficulty" id="difficulty">Difficulty: Novice</div>
+        <div class="riddle-box">
+            <div class="riddle-text" id="riddleText"></div>
+            <div class="hint-text" id="hintText"></div>
+        </div>
+        <div class="answer-section">
+            <input type="text" id="answer" class="answer-input" placeholder="Enter your answer..." autocomplete="off">
+            <div class="answer-buttons">
+                <button onclick="game.submitAnswer()">Submit</button>
+                <button onclick="game.useHint()" style="background: linear-gradient(135deg, #00ffff, #0088ff);">Hint</button>
+            </div>
+        </div>
+        <div class="message" id="message"></div>
+        <div class="controls">
+            <button onclick="game.reset()">New Game</button>
+            <button onclick="game.skip()">Skip</button>
+        </div>
+    </div>
+
+    <script>
+        class RiddleRealm {
+            constructor() {
+                this.score = 0;
+                this.streak = 0;
+                this.riddles = [];
+                this.currentRiddle = 0;
+                this.hintUsed = false;
+                this.gameActive = true;
+                this.skipsLeft = 2;
+                this.totalRiddles = 10;
+
+                this.riddles = [
+                    {
+                        riddle: "I have cities, but no houses. I have forests, but no trees. What am I?",
+                        answer: "map",
+                        hint: "You use me for navigation"
+                    },
+                    {
+                        riddle: "I am always coming, but I never arrive. What am I?",
+                        answer: "tomorrow",
+                        hint: "It's a concept of the future"
+                    },
+                    {
+                        riddle: "What has hands but cannot clap?",
+                        answer: "clock",
+                        hint: "It measures time"
+                    },
+                    {
+                        riddle: "I speak without a mouth and hear without ears. What am I?",
+                        answer: "echo",
+                        hint: "You hear me in mountains"
+                    },
+                    {
+                        riddle: "What gets wet while drying?",
+                        answer: "towel",
+                        hint: "You use me after a shower"
+                    },
+                    {
+                        riddle: "I am taken from a mine and shut up in a wooden case. What am I?",
+                        answer: "pencil lead",
+                        hint: "Used for writing"
+                    },
+                    {
+                        riddle: "The more you take, the more you leave behind. What am I?",
+                        answer: "footsteps",
+                        hint: "Walking creates these"
+                    },
+                    {
+                        riddle: "What can run but never walks?",
+                        answer: "water",
+                        hint: "Essential for life"
+                    },
+                    {
+                        riddle: "What has a neck but no head?",
+                        answer: "bottle",
+                        hint: "Holds liquids"
+                    },
+                    {
+                        riddle: "I am not alive, but I grow. What am I?",
+                        answer: "fire",
+                        hint: "Gives heat and light"
+                    }
+                ];
+
+                this.riddleSet = this.riddles.sort(() => Math.random() - 0.5).slice(0, this.totalRiddles);
+                this.init();
+            }
+
+            init() {
+                this.currentRiddle = 0;
+                this.loadRiddle();
+                this.updateUI();
+            }
+
+            loadRiddle() {
+                if (this.currentRiddle >= this.riddleSet.length) {
+                    this.endGame();
+                    return;
+                }
+
+                const riddle = this.riddleSet[this.currentRiddle];
+                document.getElementById('riddleText').textContent = riddle.riddle;
+                document.getElementById('hintText').textContent = '';
+                document.getElementById('answer').value = '';
+                document.getElementById('message').textContent = '';
+                document.getElementById('answer').focus();
+                this.hintUsed = false;
+
+                const difficulty = ['Novice', 'Beginner', 'Intermediate', 'Advanced', 'Expert'];
+                const level = Math.min(4, Math.floor(this.currentRiddle / 2));
+                document.getElementById('difficulty').textContent = `Difficulty: ${difficulty[level]}`;
+            }
+
+            submitAnswer() {
+                if (!this.gameActive) return;
+
+                const userAnswer = document.getElementById('answer').value.toLowerCase().trim();
+                const correctAnswer = this.riddleSet[this.currentRiddle].answer.toLowerCase().trim();
+
+                const messageEl = document.getElementById('message');
+
+                if (userAnswer === correctAnswer) {
+                    this.streak++;
+                    const points = 100 + (this.hintUsed ? 0 : 50) + (this.streak * 10);
+                    this.score += points;
+
+                    messageEl.textContent = `Correct! +${points} points (Streak: ${this.streak})`;
+                    messageEl.className = 'message success';
+
+                    this.currentRiddle++;
+                    setTimeout(() => this.loadRiddle(), 1500);
+                } else {
+                    this.streak = 0;
+                    messageEl.textContent = `Wrong! The answer is: ${correctAnswer}`;
+                    messageEl.className = 'message error';
+
+                    this.currentRiddle++;
+                    setTimeout(() => this.loadRiddle(), 2000);
+                }
+
+                this.updateUI();
+            }
+
+            useHint() {
+                if (this.hintUsed) {
+                    document.getElementById('message').textContent = 'Hint already used for this riddle!';
+                    document.getElementById('message').className = 'message error';
+                    return;
+                }
+
+                const hint = this.riddleSet[this.currentRiddle].hint;
+                document.getElementById('hintText').textContent = `Hint: ${hint}`;
+                this.hintUsed = true;
+                document.getElementById('message').textContent = 'Hint revealed!';
+                document.getElementById('message').className = 'message success';
+            }
+
+            skip() {
+                if (this.skipsLeft <= 0) {
+                    document.getElementById('message').textContent = 'No skips left!';
+                    document.getElementById('message').className = 'message error';
+                    return;
+                }
+
+                this.streak = 0;
+                this.skipsLeft--;
+                this.currentRiddle++;
+                this.loadRiddle();
+                this.updateUI();
+            }
+
+            endGame() {
+                this.gameActive = false;
+                document.getElementById('message').textContent = `Game Complete! Final Score: ${this.score}`;
+                document.getElementById('message').className = 'message success';
+                document.getElementById('answer').disabled = true;
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('streak').textContent = this.streak;
+                document.getElementById('riddles').textContent = Math.min(this.currentRiddle + 1, this.totalRiddles);
+            }
+
+            reset() {
+                this.score = 0;
+                this.streak = 0;
+                this.gameActive = true;
+                this.skipsLeft = 2;
+                this.init();
+                document.getElementById('answer').disabled = false;
+            }
+        }
+
+        const game = new RiddleRealm();
+
+        document.getElementById('answer').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                game.submitAnswer();
+            }
+        });
+
+        function saveHighScore() {
+            const existing = parseInt(localStorage.getItem('riddleRealmHighScore') || '0');
+            if (game.score > existing) {
+                localStorage.setItem('riddleRealmHighScore', game.score);
+            }
+        }
+
+        window.addEventListener('beforeunload', saveHighScore);
+    </script>
+</body>
+</html>

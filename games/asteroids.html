@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASTEROIDS - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 2px solid #00ff00;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+        .info {
+            color: #00ff00;
+            min-width: 220px;
+        }
+        .stat-box {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .stat-label { font-size: 11px; margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 8px;
+            background: #00ff00;
+            color: #000;
+            border: 1px solid #00ff00;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 4px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+        button:hover { opacity: 0.8; }
+        .controls {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            padding: 10px;
+            font-size: 10px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="600" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">LEVEL</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">LIVES</div>
+                <div class="stat-value" id="lives">3</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">ASTEROIDS</div>
+                <div class="stat-value" id="asteroids">5</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                ← → Rotate<br/>
+                ↑ Thrust<br/>
+                SPACE Fire<br/>
+                H Hyperspace
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESTART</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 600,
+            height: 500,
+
+            ship: null,
+            asteroids: [],
+            bullets: [],
+            particles: [],
+
+            score: 0,
+            level: 1,
+            lives: 3,
+            gameRunning: false,
+            gameOver: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.ship = {
+                    x: this.width / 2,
+                    y: this.height / 2,
+                    angle: 0,
+                    vx: 0,
+                    vy: 0,
+                    radius: 10,
+                    angularVelocity: 0
+                };
+                this.setupInput();
+                this.spawnLevel();
+                this.gameLoop();
+            },
+
+            spawnLevel() {
+                this.asteroids = [];
+                const count = 3 + this.level;
+                for (let i = 0; i < count; i++) {
+                    let x, y;
+                    do {
+                        x = Math.random() * this.width;
+                        y = Math.random() * this.height;
+                    } while (Math.hypot(x - this.ship.x, y - this.ship.y) < 150);
+
+                    this.asteroids.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 3,
+                        vy: (Math.random() - 0.5) * 3,
+                        radius: 40,
+                        rotation: 0,
+                        rotationSpeed: Math.random() * 0.1
+                    });
+                }
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Ship movement
+                this.ship.x += this.ship.vx;
+                this.ship.y += this.ship.vy;
+                this.ship.vx *= 0.99;
+                this.ship.vy *= 0.99;
+
+                // Wrap around
+                if (this.ship.x < 0) this.ship.x = this.width;
+                if (this.ship.x > this.width) this.ship.x = 0;
+                if (this.ship.y < 0) this.ship.y = this.height;
+                if (this.ship.y > this.height) this.ship.y = 0;
+
+                // Update bullets
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    const b = this.bullets[i];
+                    b.x += b.vx;
+                    b.y += b.vy;
+                    if (b.x < 0 || b.x > this.width || b.y < 0 || b.y > this.height) {
+                        this.bullets.splice(i, 1);
+                    }
+                }
+
+                // Update asteroids
+                for (let asteroid of this.asteroids) {
+                    asteroid.x += asteroid.vx;
+                    asteroid.y += asteroid.vy;
+                    asteroid.rotation += asteroid.rotationSpeed;
+
+                    if (asteroid.x < 0) asteroid.x = this.width;
+                    if (asteroid.x > this.width) asteroid.x = 0;
+                    if (asteroid.y < 0) asteroid.y = this.height;
+                    if (asteroid.y > this.height) asteroid.y = 0;
+                }
+
+                // Bullet-asteroid collision
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    const bullet = this.bullets[i];
+                    for (let j = this.asteroids.length - 1; j >= 0; j--) {
+                        const ast = this.asteroids[j];
+                        if (Math.hypot(bullet.x - ast.x, bullet.y - ast.y) < ast.radius) {
+                            this.score += Math.ceil(100 / (ast.radius / 40));
+                            this.bullets.splice(i, 1);
+                            this.asteroids.splice(j, 1);
+                            this.createParticles(ast.x, ast.y, 10);
+                            if (ast.radius > 20) {
+                                for (let k = 0; k < 2; k++) {
+                                    this.asteroids.push({
+                                        x: ast.x,
+                                        y: ast.y,
+                                        vx: (Math.random() - 0.5) * 4,
+                                        vy: (Math.random() - 0.5) * 4,
+                                        radius: ast.radius / 2,
+                                        rotation: 0,
+                                        rotationSpeed: Math.random() * 0.1
+                                    });
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Ship-asteroid collision
+                for (let ast of this.asteroids) {
+                    if (Math.hypot(this.ship.x - ast.x, this.ship.y - ast.y) < ast.radius + this.ship.radius) {
+                        this.lives--;
+                        if (this.lives <= 0) {
+                            this.gameOver = true;
+                            this.gameRunning = false;
+                        }
+                        this.ship.x = this.width / 2;
+                        this.ship.y = this.height / 2;
+                        this.createParticles(this.ship.x, this.ship.y, 20);
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                    if (p.life <= 0) this.particles.splice(i, 1);
+                }
+
+                // Level complete
+                if (this.asteroids.length === 0) {
+                    this.level++;
+                    this.spawnLevel();
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Grid
+                this.ctx.strokeStyle = '#111';
+                this.ctx.lineWidth = 0.5;
+                for (let x = 0; x < this.width; x += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.height);
+                    this.ctx.stroke();
+                }
+
+                // Ship
+                this.ctx.save();
+                this.ctx.translate(this.ship.x, this.ship.y);
+                this.ctx.rotate(this.ship.angle);
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(10, 0);
+                this.ctx.lineTo(-8, -8);
+                this.ctx.lineTo(-4, 0);
+                this.ctx.lineTo(-8, 8);
+                this.ctx.closePath();
+                this.ctx.stroke();
+                this.ctx.restore();
+
+                // Asteroids
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 2;
+                for (let ast of this.asteroids) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(ast.x, ast.y, ast.radius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                }
+
+                // Bullets
+                this.ctx.fillStyle = '#ffff00';
+                for (let b of this.bullets) {
+                    this.ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
+                }
+
+                // Particles
+                this.ctx.fillStyle = '#ff8800';
+                for (let p of this.particles) {
+                    this.ctx.globalAlpha = p.life / 20;
+                    this.ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+                }
+                this.ctx.globalAlpha = 1;
+
+                // HUD
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = '12px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 20);
+                this.ctx.fillText(`Level: ${this.level}`, 10, 40);
+                this.ctx.fillText(`Lives: ${this.lives}`, 10, 60);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                    this.ctx.textAlign = 'left';
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('lives').textContent = this.lives;
+                document.getElementById('asteroids').textContent = this.asteroids.length;
+            },
+
+            createParticles(x, y, count) {
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: (Math.random() - 0.5) * 4,
+                        life: 20
+                    });
+                }
+            },
+
+            setupInput() {
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key.toLowerCase()] = true;
+                    if (e.key === ' ') {
+                        this.bullets.push({
+                            x: this.ship.x + 10 * Math.cos(this.ship.angle),
+                            y: this.ship.y + 10 * Math.sin(this.ship.angle),
+                            vx: 6 * Math.cos(this.ship.angle) + this.ship.vx,
+                            vy: 6 * Math.sin(this.ship.angle) + this.ship.vy
+                        });
+                        e.preventDefault();
+                    }
+                    if (e.key.toLowerCase() === 'h') {
+                        this.ship.x = Math.random() * this.width;
+                        this.ship.y = Math.random() * this.height;
+                    }
+                    if (!this.gameRunning && !this.gameOver && e.key === ' ') this.start();
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key.toLowerCase()] = false;
+                });
+
+                setInterval(() => {
+                    if (keys['arrowleft']) this.ship.angle -= 0.1;
+                    if (keys['arrowright']) this.ship.angle += 0.1;
+                    if (keys['arrowup']) {
+                        this.ship.vx += 0.5 * Math.cos(this.ship.angle);
+                        this.ship.vy += 0.5 * Math.sin(this.ship.angle);
+                    }
+                }, 20);
+            },
+
+            restart() {
+                this.asteroids = [];
+                this.bullets = [];
+                this.particles = [];
+                this.score = 0;
+                this.level = 1;
+                this.lives = 3;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.ship.vx = 0;
+                this.ship.vy = 0;
+                this.spawnLevel();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

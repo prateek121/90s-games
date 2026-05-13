@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Racer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(45deg, #001a00, #003300);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            background: linear-gradient(to bottom, #000, #001a00);
+            border: 4px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5), inset 0 0 20px rgba(0, 255, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 10px;
+            font-size: 2em;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            color: #00ff00;
+            font-size: 0.9em;
+        }
+
+        .stat {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 8px;
+            border: 2px solid #00ff00;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        canvas {
+            background: linear-gradient(to bottom, #87ceeb, #90ee90);
+            border: 3px solid #00ff00;
+            display: block;
+            margin: 15px auto;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+
+        .controls {
+            color: #00ff00;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 30px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #00cc00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .message {
+            color: #ffff00;
+            font-size: 1.1em;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RETRO RACER</h1>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">DISTANCE</div>
+                <div class="stat-value" id="distance">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">SPEED</div>
+                <div class="stat-value" id="speed">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">HEALTH</div>
+                <div class="stat-value" id="health">100</div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="400"></canvas>
+
+        <div class="controls">
+            <p>← → Arrow Keys to Steer | UP to Accelerate | DOWN to Brake</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <button id="startBtn" onclick="game.start()">START RACE</button>
+        <button onclick="location.reload()">RESET</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            running: false,
+            distance: 0,
+            health: 100,
+            maxHealth: 100,
+
+            player: {
+                x: 225,
+                y: 350,
+                width: 30,
+                height: 50,
+                speed: 0,
+                maxSpeed: 8,
+                acceleration: 0.3,
+                friction: 0.95,
+                rotation: 0
+            },
+
+            obstacles: [],
+            road_lines: [],
+            keys: {},
+
+            init() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            start() {
+                this.running = true;
+                this.distance = 0;
+                this.health = this.maxHealth;
+                this.player.speed = 0;
+                this.obstacles = [];
+                this.road_lines = [];
+                document.getElementById('startBtn').disabled = true;
+                this.generateObstacles();
+                this.update();
+            },
+
+            generateObstacles() {
+                for (let i = 0; i < 15; i++) {
+                    this.obstacles.push({
+                        x: (Math.random() > 0.5 ? 150 : 300),
+                        y: -i * 100,
+                        width: 50,
+                        height: 40,
+                        type: Math.random() > 0.7 ? 'oil' : 'car'
+                    });
+                }
+            },
+
+            update() {
+                if (!this.running) return;
+
+                // Handle input
+                if (this.keys['ArrowUp'] || this.keys['w']) {
+                    this.player.speed = Math.min(this.player.speed + this.player.acceleration, this.player.maxSpeed);
+                }
+                if (this.keys['ArrowDown'] || this.keys['s']) {
+                    this.player.speed = Math.max(this.player.speed - this.player.acceleration, -2);
+                }
+
+                // Steering
+                const moveSpeed = 5;
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    this.player.x = Math.max(100, this.player.x - moveSpeed);
+                    this.player.rotation = -0.3;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    this.player.x = Math.min(400, this.player.x + moveSpeed);
+                    this.player.rotation = 0.3;
+                }
+                if (!this.keys['ArrowLeft'] && !this.keys['ArrowRight'] && !this.keys['a'] && !this.keys['d']) {
+                    this.player.rotation *= 0.8;
+                }
+
+                // Apply friction
+                this.player.speed *= this.player.friction;
+
+                // Update distance
+                if (this.player.speed > 0) {
+                    this.distance += this.player.speed;
+                }
+
+                // Move obstacles
+                for (let i = 0; i < this.obstacles.length; i++) {
+                    this.obstacles[i].y += this.player.speed * 0.5;
+
+                    // Collision detection
+                    if (this.collides(this.player, this.obstacles[i])) {
+                        this.health -= 15;
+                        this.obstacles[i].y = -100;
+                        if (this.obstacles[i].type === 'oil') {
+                            this.player.speed *= 0.5;
+                        }
+                    }
+
+                    // Remove off-screen obstacles and add new ones
+                    if (this.obstacles[i].y > canvas.height) {
+                        this.obstacles[i].y = -50;
+                        this.obstacles[i].x = (Math.random() > 0.5 ? 150 : 300);
+                    }
+                }
+
+                // Road lines for visual effect
+                for (let i = -1; i < canvas.height / 50; i++) {
+                    const y = (this.distance * 2 + i * 50) % canvas.height;
+                    if (y < 0) continue;
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(250, y);
+                    ctx.lineTo(250, y + 30);
+                    ctx.stroke();
+                }
+
+                if (this.health <= 0) {
+                    this.running = false;
+                    document.getElementById('message').textContent = 'CRASHED! Distance: ' + Math.floor(this.distance);
+                    document.getElementById('startBtn').disabled = false;
+                    this.saveScore();
+                    return;
+                }
+
+                this.draw();
+                this.updateUI();
+                requestAnimationFrame(() => this.update());
+            },
+
+            collides(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            draw() {
+                ctx.fillStyle = '#87ceeb';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw road
+                ctx.fillStyle = '#333';
+                ctx.fillRect(100, 0, 300, canvas.height);
+
+                // Draw road lines
+                for (let i = -1; i < canvas.height / 50; i++) {
+                    const y = (this.distance * 2 + i * 50) % canvas.height;
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(250, y);
+                    ctx.lineTo(250, y + 30);
+                    ctx.stroke();
+                }
+
+                // Draw obstacles
+                for (const obs of this.obstacles) {
+                    if (obs.type === 'car') {
+                        ctx.fillStyle = '#ff0000';
+                    } else {
+                        ctx.fillStyle = '#000';
+                    }
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                }
+
+                // Draw player car
+                ctx.save();
+                ctx.translate(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2);
+                ctx.rotate(this.player.rotation);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(-this.player.width / 2, -this.player.height / 2, this.player.width, this.player.height);
+                ctx.fillStyle = '#0000ff';
+                ctx.fillRect(-this.player.width / 2 + 5, -this.player.height / 2 + 5, 20, 10);
+                ctx.restore();
+            },
+
+            updateUI() {
+                document.getElementById('distance').textContent = Math.floor(this.distance);
+                document.getElementById('speed').textContent = Math.floor(this.player.speed * 10);
+                document.getElementById('health').textContent = Math.max(0, this.health);
+            },
+
+            saveScore() {
+                let scores = JSON.parse(localStorage.getItem('racerScores') || '[]');
+                scores.push({ score: Math.floor(this.distance), date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.score - a.score);
+                localStorage.setItem('racerScores', JSON.stringify(scores.slice(0, 10)));
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

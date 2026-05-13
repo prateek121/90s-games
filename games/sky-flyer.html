@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky Flyer - 90s Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #87CEEB, #E0FFFF);
+            font-family: 'Arial', sans-serif;
+            color: #333;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            color: #1e90ff;
+        }
+
+        #gameCanvas {
+            border: 3px solid #1e90ff;
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0FFFF 100%);
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .stat {
+            background: rgba(30, 144, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: 2px solid #1e90ff;
+            color: #333;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(30, 144, 255, 0.2);
+            border-radius: 5px;
+            border: 2px solid #1e90ff;
+        }
+
+        button {
+            background: #1e90ff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #4169e1;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            border: 3px solid #1e90ff;
+        }
+
+        .game-over h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #1e90ff;
+        }
+
+        .game-over p {
+            font-size: 1.3em;
+            margin: 10px 0;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦅 Sky Flyer 🦅</h1>
+        <div class="stats">
+            <div class="stat">Altitude: <span id="altitude">0</span>m</div>
+            <div class="stat">Speed: <span id="speed">0</span></div>
+            <div class="stat">Score: <span id="score">0</span></div>
+            <div class="stat">Collisions: <span id="collisions">0</span></div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            <button onclick="togglePause()">Pause</button>
+            <button onclick="restartGame()">Restart</button>
+            <button onclick="goHome()">Home</button>
+        </div>
+        <p style="margin-top: 15px; color: #333;">Arrow keys to control | Space to pause</p>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p>Max Altitude: <span id="finalAltitude">0</span>m</p>
+        <p>Collisions: <span id="finalCollisions">0</span></p>
+        <button onclick="restartGame()" style="margin-top: 20px;">Play Again</button>
+        <button onclick="goHome()" style="margin-top: 20px;">Home</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            score: 0,
+            altitude: 0,
+            maxAltitude: 0,
+            speed: 0,
+            collisions: 0,
+            isPaused: false,
+            gameOver: false,
+            time: 0
+        };
+
+        const bird = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            vx: 0,
+            vy: 0,
+            width: 30,
+            height: 20,
+            wingRotation: 0
+        };
+
+        const keys = {};
+
+        class Obstacle {
+            constructor() {
+                this.x = canvas.width;
+                this.y = Math.random() * (canvas.height - 100) + 50;
+                this.width = 40;
+                this.height = 80;
+                this.vx = -5 - game.time / 100;
+                this.passed = false;
+            }
+
+            update() {
+                this.x += this.vx;
+            }
+
+            draw() {
+                ctx.fillStyle = '#228B22';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+            }
+
+            isOffScreen() {
+                return this.x + this.width < 0;
+            }
+
+            collidesWith(x, y, w, h) {
+                return x < this.x + this.width &&
+                       x + w > this.x &&
+                       y < this.y + this.height &&
+                       y + h > this.y;
+            }
+        }
+
+        class Cloud {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = -2;
+                this.width = 60;
+                this.height = 30;
+            }
+
+            update() {
+                this.x += this.vx;
+            }
+
+            draw() {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x + 15, this.y, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x + 30, this.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        let obstacles = [];
+        let clouds = [];
+
+        function initGame() {
+            obstacles = [];
+            clouds = [];
+            game.score = 0;
+            game.altitude = 0;
+            game.maxAltitude = 0;
+            game.speed = 0;
+            game.collisions = 0;
+            game.isPaused = false;
+            game.gameOver = false;
+            game.time = 0;
+            bird.x = canvas.width / 2;
+            bird.y = canvas.height / 2;
+            bird.vx = 0;
+            bird.vy = 0;
+
+            for (let i = 0; i < 3; i++) {
+                clouds.push(new Cloud(Math.random() * canvas.width, Math.random() * 150 + 30));
+            }
+        }
+
+        function update() {
+            if (game.gameOver || game.isPaused) return;
+
+            game.time++;
+            game.speed = Math.floor(Math.sqrt(game.time) / 2);
+
+            bird.vx = 0;
+            if (keys['ArrowLeft']) bird.vx = -6;
+            if (keys['ArrowRight']) bird.vx = 6;
+
+            bird.vy = 2;
+            if (keys['ArrowUp']) bird.vy = -5;
+
+            bird.x += bird.vx;
+            bird.y += bird.vy;
+
+            bird.x = Math.max(bird.width / 2, Math.min(canvas.width - bird.width / 2, bird.x));
+            bird.y = Math.max(bird.height / 2, Math.min(canvas.height - bird.height / 2, bird.y));
+
+            game.altitude = Math.floor((canvas.height - bird.y) / canvas.height * 1000);
+            game.maxAltitude = Math.max(game.maxAltitude, game.altitude);
+
+            bird.wingRotation += 0.2;
+
+            if (game.time % 80 === 0) {
+                obstacles.push(new Obstacle());
+            }
+
+            obstacles.forEach((obs, idx) => {
+                obs.update();
+
+                if (!obs.passed && obs.x + obs.width < bird.x) {
+                    obs.passed = true;
+                    game.score += 100;
+                }
+
+                if (obs.collidesWith(bird.x - bird.width / 2, bird.y - bird.height / 2, bird.width, bird.height)) {
+                    game.collisions++;
+                    if (game.collisions >= 3) {
+                        endGame();
+                        return;
+                    }
+                }
+
+                if (obs.isOffScreen()) {
+                    obstacles.splice(idx, 1);
+                }
+            });
+
+            clouds.forEach((cloud, idx) => {
+                cloud.update();
+                if (cloud.x + cloud.width < 0) {
+                    clouds.splice(idx, 1);
+                    clouds.push(new Cloud(canvas.width + 50, Math.random() * 150 + 30));
+                }
+            });
+
+            updateUI();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            clouds.forEach(c => c.draw());
+            obstacles.forEach(o => o.draw());
+
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, bird.width, bird.height, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(bird.width / 3, -3, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#FF6B35';
+            ctx.beginPath();
+            ctx.moveTo(bird.width / 2, 0);
+            ctx.lineTo(bird.width / 2 + 5, 2);
+            ctx.lineTo(bird.width / 2, -2);
+            ctx.fill();
+
+            ctx.restore();
+
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Lives: ${3 - game.collisions}`, 10, 30);
+        }
+
+        function updateUI() {
+            document.getElementById('altitude').textContent = game.altitude;
+            document.getElementById('speed').textContent = game.speed;
+            document.getElementById('score').textContent = game.score;
+            document.getElementById('collisions').textContent = game.collisions;
+        }
+
+        function endGame() {
+            game.gameOver = true;
+            document.getElementById('finalScore').textContent = game.score;
+            document.getElementById('finalAltitude').textContent = game.maxAltitude;
+            document.getElementById('finalCollisions').textContent = game.collisions;
+            document.getElementById('gameOverScreen').style.display = 'block';
+            saveScore();
+        }
+
+        function togglePause() {
+            game.isPaused = !game.isPaused;
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            initGame();
+        }
+
+        function goHome() {
+            window.location.href = '/90s-games/';
+        }
+
+        function saveScore() {
+            let scores = JSON.parse(localStorage.getItem('skyFlyerScores') || '[]');
+            scores.push({ score: game.score, altitude: game.maxAltitude, date: new Date().toISOString() });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('skyFlyerScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

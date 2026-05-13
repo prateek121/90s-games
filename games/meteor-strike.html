@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>METEOR STRIKE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #0f0f1e);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #1a1a2e, #0f0f1e);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(255, 100, 0, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #ccc; }
+        button {
+            padding: 8px 16px;
+            background: #ff6600;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #ff8800; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>☄️ METEOR STRIKE ☄️</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>LEFT/RIGHT ARROW or A/D to move</p>
+                <p>Dodge the falling meteors!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 175, y: 550, width: 30, height: 30, speed: 5 },
+            meteors: [],
+            explosions: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            highScore: localStorage.getItem('meteor-strike-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 550, width: 30, height: 30, speed: 5 };
+                this.meteors = [];
+                this.explosions = [];
+                this.score = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Handle input
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    if (this.player.x > 0) this.player.x -= this.player.speed;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    if (this.player.x + this.player.width < this.width) this.player.x += this.player.speed;
+                }
+
+                // Spawn meteors
+                this.frameCount++;
+                const spawnRate = Math.max(20, 50 - Math.floor(this.score / 100) * 3);
+                if (this.frameCount % spawnRate === 0) {
+                    const size = 15 + Math.random() * 25;
+                    this.meteors.push({
+                        x: Math.random() * (this.width - size),
+                        y: -size,
+                        size: size,
+                        vy: 3 + this.score / 200,
+                        rotation: Math.random() * Math.PI * 2,
+                        rotationSpeed: (Math.random() - 0.5) * 0.2
+                    });
+                }
+
+                // Update meteors
+                for (let i = this.meteors.length - 1; i >= 0; i--) {
+                    const meteor = this.meteors[i];
+                    meteor.y += meteor.vy;
+                    meteor.rotation += meteor.rotationSpeed;
+
+                    if (meteor.y > this.height) {
+                        this.meteors.splice(i, 1);
+                        this.score++;
+                    } else {
+                        if (this.checkCollision(this.player, meteor)) {
+                            this.createExplosion(meteor.x, meteor.y);
+                            this.endGame();
+                        }
+                    }
+                }
+
+                // Update explosions
+                for (let i = this.explosions.length - 1; i >= 0; i--) {
+                    const exp = this.explosions[i];
+                    exp.life--;
+                    if (exp.life <= 0) this.explosions.splice(i, 1);
+                }
+            },
+
+            checkCollision(rect, meteor) {
+                const distance = Math.sqrt(
+                    Math.pow((rect.x + rect.width / 2) - (meteor.x + meteor.size / 2), 2) +
+                    Math.pow((rect.y + rect.height / 2) - (meteor.y + meteor.size / 2), 2)
+                );
+                return distance < (rect.width / 2 + meteor.size / 2);
+            },
+
+            createExplosion(x, y) {
+                this.explosions.push({
+                    x: x,
+                    y: y,
+                    radius: 0,
+                    maxRadius: 60,
+                    life: 30,
+                    maxLife: 30
+                });
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('meteor-strike-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Space background with stars
+                this.ctx.fillStyle = '#0f0f1e';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw stars
+                this.ctx.fillStyle = '#ffffff';
+                for (let i = 0; i < 20; i++) {
+                    const x = (i * 73) % this.width;
+                    const y = (i * 43) % this.height;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 1, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Draw meteors
+                for (let meteor of this.meteors) {
+                    this.ctx.save();
+                    this.ctx.translate(meteor.x + meteor.size / 2, meteor.y + meteor.size / 2);
+                    this.ctx.rotate(meteor.rotation);
+
+                    // Meteor body
+                    this.ctx.fillStyle = '#664422';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, meteor.size / 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Meteor crater
+                    this.ctx.fillStyle = '#442211';
+                    this.ctx.beginPath();
+                    this.ctx.arc(-meteor.size / 6, -meteor.size / 6, meteor.size / 6, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Flame trail
+                    this.ctx.fillStyle = 'rgba(255, 100, 0, 0.7)';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, meteor.size / 2 + 5, meteor.size / 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    this.ctx.restore();
+                }
+
+                // Draw explosions
+                for (let exp of this.explosions) {
+                    exp.radius = (exp.maxRadius * (1 - exp.life / exp.maxLife));
+                    this.ctx.fillStyle = `rgba(255, 100, 0, ${0.5 * (exp.life / exp.maxLife)})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = `rgba(255, 200, 0, ${(exp.life / exp.maxLife)})`;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                // Draw player (shield)
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(this.player.x - 5, this.player.y - 5, this.player.width + 10, this.player.height + 10);
+                this.ctx.fillStyle = '#00dd00';
+                this.ctx.fillRect(this.player.x + 5, this.player.y + 5, 8, 8);
+                this.ctx.fillRect(this.player.x + 17, this.player.y + 5, 8, 8);
+
+                // Score and info
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

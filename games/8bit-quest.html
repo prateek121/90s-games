@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8-Bit Quest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(45deg, #1a0033, #330066);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            background: linear-gradient(to bottom, #000033, #1a0033);
+            border: 4px solid #0099ff;
+            box-shadow: 0 0 20px rgba(0, 153, 255, 0.5), inset 0 0 20px rgba(0, 153, 255, 0.1);
+            padding: 20px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #0099ff;
+            text-shadow: 0 0 10px #0099ff;
+            margin-bottom: 10px;
+            font-size: 2em;
+            letter-spacing: 2px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            color: #0099ff;
+            font-size: 0.9em;
+        }
+
+        .stat {
+            background: rgba(0, 153, 255, 0.1);
+            padding: 8px;
+            border: 2px solid #0099ff;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        canvas {
+            background: #000;
+            border: 3px solid #0099ff;
+            display: block;
+            margin: 15px auto;
+            box-shadow: 0 0 15px rgba(0, 153, 255, 0.3);
+            image-rendering: pixelated;
+        }
+
+        .controls {
+            color: #0099ff;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        button {
+            background: #0099ff;
+            color: #000;
+            border: none;
+            padding: 10px 30px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #00ccff;
+            box-shadow: 0 0 10px #0099ff;
+        }
+
+        .message {
+            color: #ffff00;
+            font-size: 1.1em;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>8-BIT QUEST</h1>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">LEVEL</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">GOLD</div>
+                <div class="stat-value" id="gold">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">HEALTH</div>
+                <div class="stat-value" id="health">100</div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="400"></canvas>
+
+        <div class="controls">
+            <p>← → to Move | SPACE to Jump | X to Attack</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <button id="startBtn" onclick="game.start()">START QUEST</button>
+        <button onclick="location.reload()">RESET</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            running: false,
+            level: 1,
+            gold: 0,
+            health: 100,
+            maxHealth: 100,
+
+            player: {
+                x: 50,
+                y: 300,
+                width: 20,
+                height: 30,
+                velocityY: 0,
+                velocityX: 0,
+                speed: 4,
+                jumpPower: 12,
+                isJumping: false,
+                direction: 1,
+                attackCooldown: 0
+            },
+
+            platforms: [],
+            enemies: [],
+            gold_items: [],
+            particles: [],
+            keys: {},
+
+            init() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        if (this.player.isJumping === false) {
+                            this.player.velocityY = -this.player.jumpPower;
+                            this.player.isJumping = true;
+                        }
+                    }
+                    if (e.key === 'x' || e.key === 'X') {
+                        this.playerAttack();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            start() {
+                this.running = true;
+                this.level = 1;
+                this.gold = 0;
+                this.health = this.maxHealth;
+                this.setupLevel();
+                document.getElementById('startBtn').disabled = true;
+                this.update();
+            },
+
+            setupLevel() {
+                this.platforms = [
+                    { x: 0, y: 380, width: 500, height: 20 },
+                    { x: 50, y: 320, width: 120, height: 15 },
+                    { x: 250, y: 280, width: 150, height: 15 },
+                    { x: 100, y: 220, width: 100, height: 15 }
+                ];
+
+                this.enemies = [];
+                for (let i = 0; i < 2 + this.level; i++) {
+                    this.enemies.push({
+                        x: 200 + i * 80,
+                        y: 250 - i * 50,
+                        width: 20,
+                        height: 25,
+                        speed: 1 + this.level * 0.3,
+                        direction: -1,
+                        patrolMin: 150,
+                        patrolMax: 400,
+                        health: 20 + this.level * 5
+                    });
+                }
+
+                this.gold_items = [];
+                for (let i = 0; i < 5 + this.level * 2; i++) {
+                    this.gold_items.push({
+                        x: Math.random() * 450,
+                        y: 50 + Math.random() * 300,
+                        width: 10,
+                        height: 10,
+                        collected: false
+                    });
+                }
+            },
+
+            playerAttack() {
+                if (this.player.attackCooldown > 0) return;
+                this.player.attackCooldown = 15;
+
+                const attackX = this.player.x + (this.player.direction > 0 ? this.player.width : 0);
+                const attackArea = {
+                    x: this.player.x - 20,
+                    y: this.player.y - 10,
+                    width: 60,
+                    height: 50
+                };
+
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    if (this.collides(attackArea, this.enemies[i])) {
+                        this.enemies[i].health -= 25;
+                        if (this.enemies[i].health <= 0) {
+                            this.gold += 100 * this.level;
+                            this.enemies.splice(i, 1);
+                        }
+                        this.createParticles(attackX, this.player.y, '#ff6600');
+                    }
+                }
+            },
+
+            createParticles(x, y, color) {
+                for (let i = 0; i < 5; i++) {
+                    this.particles.push({
+                        x,
+                        y,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: (Math.random() - 0.5) * 4 - 2,
+                        life: 20,
+                        color
+                    });
+                }
+            },
+
+            update() {
+                if (!this.running) return;
+
+                // Update player movement
+                this.player.velocityX = 0;
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    this.player.velocityX = -this.player.speed;
+                    this.player.direction = -1;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    this.player.velocityX = this.player.speed;
+                    this.player.direction = 1;
+                }
+
+                this.player.x += this.player.velocityX;
+                this.player.velocityY += 0.5; // Gravity
+                this.player.y += this.player.velocityY;
+
+                // Boundary check
+                if (this.player.x < 0) this.player.x = 0;
+                if (this.player.x + this.player.width > canvas.width) this.player.x = canvas.width - this.player.width;
+
+                // Platform collision
+                this.player.isJumping = true;
+                for (const platform of this.platforms) {
+                    if (this.collides(this.player, platform) && this.player.velocityY >= 0) {
+                        this.player.y = platform.y - this.player.height;
+                        this.player.velocityY = 0;
+                        this.player.isJumping = false;
+                    }
+                }
+
+                // Fall off map
+                if (this.player.y > canvas.height) {
+                    this.health -= 20;
+                    this.player.y = 300;
+                    this.player.x = 50;
+                }
+
+                // Update enemies
+                for (const enemy of this.enemies) {
+                    enemy.x += enemy.speed * enemy.direction;
+                    if (enemy.x <= enemy.patrolMin || enemy.x >= enemy.patrolMax) {
+                        enemy.direction *= -1;
+                    }
+
+                    if (this.collides(this.player, enemy)) {
+                        this.health -= 10;
+                        this.player.x -= 30 * this.player.direction;
+                    }
+                }
+
+                // Collect gold
+                for (const item of this.gold_items) {
+                    if (!item.collected && this.collides(this.player, item)) {
+                        this.gold += 50;
+                        item.collected = true;
+                        this.createParticles(item.x, item.y, '#ffff00');
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    this.particles[i].x += this.particles[i].vx;
+                    this.particles[i].y += this.particles[i].vy;
+                    this.particles[i].life--;
+                    if (this.particles[i].life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                // Reduce cooldowns
+                if (this.player.attackCooldown > 0) this.player.attackCooldown--;
+
+                // Check level completion
+                if (this.enemies.length === 0 && this.gold_items.filter(g => !g.collected).length === 0) {
+                    this.level++;
+                    this.setupLevel();
+                }
+
+                if (this.health <= 0) {
+                    this.running = false;
+                    document.getElementById('message').textContent = 'QUEST FAILED! Gold: ' + this.gold;
+                    document.getElementById('startBtn').disabled = false;
+                    this.saveScore();
+                    return;
+                }
+
+                this.draw();
+                this.updateUI();
+                requestAnimationFrame(() => this.update());
+            },
+
+            collides(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw platforms
+                ctx.fillStyle = '#8B4513';
+                for (const platform of this.platforms) {
+                    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    ctx.strokeStyle = '#D2691E';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                }
+
+                // Draw gold items
+                ctx.fillStyle = '#ffff00';
+                for (const item of this.gold_items) {
+                    if (!item.collected) {
+                        ctx.fillRect(item.x, item.y, item.width, item.height);
+                    }
+                }
+
+                // Draw player
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+
+                // Draw enemies
+                ctx.fillStyle = '#ff0000';
+                for (const enemy of this.enemies) {
+                    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(enemy.x + 2, enemy.y + 2, 4, 4);
+                    ctx.fillStyle = '#ff0000';
+                }
+
+                // Draw particles
+                for (const p of this.particles) {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life / 20;
+                    ctx.fillRect(p.x, p.y, 4, 4);
+                    ctx.globalAlpha = 1;
+                }
+            },
+
+            updateUI() {
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('gold').textContent = this.gold;
+                document.getElementById('health').textContent = Math.max(0, this.health);
+            },
+
+            saveScore() {
+                let scores = JSON.parse(localStorage.getItem('questScores') || '[]');
+                scores.push({ score: this.gold, level: this.level, date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.score - a.score);
+                localStorage.setItem('questScores', JSON.stringify(scores.slice(0, 10)));
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLOW STATE - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a472a 0%, #0f2818 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ff88;
+            background: #0a1f14;
+            display: block;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        .info {
+            color: #00ff88;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid #00ff88;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #00ff88;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid #00ff88;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Moves</div>
+                <div class="stat-value" id="moves">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>RULES:</strong><br/>
+                Connect dots<br/>
+                Create pipelines<br/>
+                Complete the circuit
+            </div>
+            <button onclick="game.newGame()">NEW GAME</button>
+            <button onclick="game.reset()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 500,
+
+            gridSize: 5,
+            tiles: [],
+            selected: null,
+            particles: [],
+            score: 0,
+            moves: 0,
+            level: 1,
+            timeLeft: 120,
+            maxTime: 120,
+            best: localStorage.getItem('flowStateBest') || 0,
+            gameOver: false,
+            gameRunning: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.newGame();
+                this.gameLoop();
+            },
+
+            newGame() {
+                this.tiles = [];
+                this.particles = [];
+                this.level = Math.floor(this.score / 100) + 1;
+                for (let i = 0; i < this.gridSize; i++) {
+                    for (let j = 0; j < this.gridSize; j++) {
+                        const rand = Math.random();
+                        const color = rand < 0.2 ? '#ff0080' : rand < 0.4 ? '#00ffff' : rand < 0.6 ? '#ffff00' : rand < 0.8 ? '#00ff88' : '#ff00ff';
+                        this.tiles.push({ x: i, y: j, color: color, connected: false });
+                    }
+                }
+                this.selected = null;
+                this.moves = 0;
+                this.gameOver = false;
+                this.gameRunning = true;
+                this.timeLeft = this.maxTime - this.level * 10;
+                this.startTimer();
+            },
+
+            startTimer() {
+                const timer = setInterval(() => {
+                    if (this.gameRunning && this.timeLeft > 0) {
+                        this.timeLeft--;
+                    } else if (this.timeLeft <= 0) {
+                        this.gameRunning = false;
+                        this.gameOver = true;
+                        clearInterval(timer);
+                        if (this.score > this.best) {
+                            this.best = this.score;
+                            localStorage.setItem('flowStateBest', this.best);
+                        }
+                    }
+                }, 1000);
+            },
+
+            reset() {
+                this.newGame();
+            },
+
+            selectTile(x, y) {
+                if (this.gameOver || !this.gameRunning) return;
+
+                const tile = this.getTile(x, y);
+                if (!tile) return;
+
+                if (this.selected && this.selected.color === tile.color && this.selected !== tile) {
+                    tile.connected = true;
+                    this.selected.connected = true;
+                    const bonus = Math.max(5, 20 - this.moves / 5);
+                    this.score += Math.round(bonus);
+                    this.moves++;
+                    this.createParticles(tile.x, tile.y, tile.color);
+                    this.selected = null;
+
+                    if (this.checkWin()) {
+                        this.gameRunning = false;
+                        this.gameOver = true;
+                        const timeBonus = Math.max(0, this.timeLeft * 2);
+                        this.score += timeBonus;
+                        if (this.score > this.best) {
+                            this.best = this.score;
+                            localStorage.setItem('flowStateBest', this.best);
+                        }
+                    }
+                } else {
+                    this.selected = tile;
+                    this.moves++;
+                }
+            },
+
+            createParticles(x, y, color) {
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI * 2 * i) / 6;
+                    this.particles.push({
+                        x: 60 + x * 80 + 35,
+                        y: 60 + y * 80 + 35,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        color: color,
+                        life: 20
+                    });
+                }
+            },
+
+            getTile(x, y) {
+                for (let tile of this.tiles) {
+                    if (tile.x === x && tile.y === y) return tile;
+                }
+                return null;
+            },
+
+            checkWin() {
+                return this.tiles.every(t => t.connected);
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0a1f14');
+                gradient.addColorStop(1, '#051410');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                const tileSize = 70;
+                const padding = 10;
+
+                this.ctx.fillStyle = '#00ff88';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`Flow State - Level ${this.level}`, this.width / 2, 20);
+
+                for (let tile of this.tiles) {
+                    const px = 60 + tile.x * (tileSize + padding);
+                    const py = 60 + tile.y * (tileSize + padding);
+
+                    if (tile === this.selected) {
+                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                        this.ctx.fillRect(px - 5, py - 5, tileSize + 10, tileSize + 10);
+                    }
+
+                    this.ctx.fillStyle = tile.connected ? 'rgba(0, 255, 136, 0.5)' : tile.color;
+                    this.ctx.shadowColor = tile.color;
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.fillRect(px, py, tileSize, tileSize);
+                    this.ctx.shadowBlur = 0;
+
+                    this.ctx.strokeStyle = '#00ff88';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(px, py, tileSize, tileSize);
+                }
+
+                // Draw particles
+                this.ctx.fillStyle = '#00ff88';
+                for (let p of this.particles) {
+                    this.ctx.globalAlpha = p.life / 20;
+                    this.ctx.fillRect(p.x, p.y, 4, 4);
+                }
+                this.ctx.globalAlpha = 1;
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life--;
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                this.ctx.fillStyle = '#00ff88';
+                this.ctx.font = '12px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, this.height - 30);
+                this.ctx.fillText(`Moves: ${this.moves}`, 10, this.height - 10);
+                this.ctx.fillText(`Time: ${this.timeLeft}s`, 200, this.height - 30);
+                this.ctx.fillText(`Connected: ${this.tiles.filter(t => t.connected).length}/${this.tiles.length}`, 200, this.height - 10);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    const connected = this.tiles.filter(t => t.connected).length;
+                    const completed = connected === this.tiles.length;
+                    this.ctx.fillStyle = completed ? '#00ff88' : '#ff0080';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(completed ? 'LEVEL COMPLETE!' : 'TIME UP!', this.width / 2, this.height / 2 - 40);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2);
+                    this.ctx.fillText(`Level: ${this.level}`, this.width / 2, this.height / 2 + 30);
+                    this.ctx.fillText(`Best: ${this.best}`, this.width / 2, this.height / 2 + 60);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('moves').textContent = this.moves;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+
+                    const gridX = Math.floor((clickX - 60) / 80);
+                    const gridY = Math.floor((clickY - 60) / 80);
+
+                    if (gridX >= 0 && gridX < this.gridSize && gridY >= 0 && gridY < this.gridSize) {
+                        this.selectTile(gridX, gridY);
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

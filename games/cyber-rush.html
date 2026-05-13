@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER RUSH - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #2a0845 0%, #1a0033 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ddff;
+            background: #000;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(0, 221, 255, 0.5);
+        }
+        .info {
+            color: #00ddff;
+            margin-top: 20px;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(0, 221, 255, 0.5);
+        }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ff0099;
+            text-shadow: 0 0 10px rgba(255, 0, 153, 0.8);
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #00ddff;
+        }
+        button {
+            padding: 8px 16px;
+            background: #00ddff;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(0, 221, 255, 0.5);
+        }
+        button:hover {
+            background: #ff0099;
+            box-shadow: 0 0 20px rgba(255, 0, 153, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #00ddff; text-shadow: 0 0 20px rgba(0, 221, 255, 0.8);">🏃 CYBER RUSH 🏃</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>ARROW KEYS or A/D to move</p>
+                <p>Don't hit the walls!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            player: { x: 175, y: 550, width: 40, height: 40 },
+            obstacles: [],
+            particles: [],
+            powerUps: [],
+            score: 0,
+            health: 100,
+            level: 1,
+            combos: 0,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            speed: 3,
+            difficulty: 1,
+            highScore: localStorage.getItem('cyberRushHigh') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 550, width: 40, height: 40 };
+                this.obstacles = [];
+                this.particles = [];
+                this.powerUps = [];
+                this.score = 0;
+                this.health = 100;
+                this.level = 1;
+                this.combos = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.speed = 3;
+                this.difficulty = 1;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.frameCount++;
+                this.speed = 3 + this.score / 100;
+                this.difficulty = 1 + this.score / 150;
+
+                // Level up every 20 points
+                const newLevel = Math.floor(this.score / 20) + 1;
+                if (newLevel > this.level) {
+                    this.level = newLevel;
+                    this.spawnPowerUp();
+                }
+
+                // Generate obstacles
+                const spawnRate = Math.max(25, 40 - this.score / 30);
+                if (this.frameCount % spawnRate === 0) {
+                    this.spawnObstacle();
+                }
+
+                // Update obstacles
+                for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                    const obs = this.obstacles[i];
+                    obs.y += this.speed;
+
+                    // Collision check
+                    if (this.collides(this.player, obs)) {
+                        this.health -= 25;
+                        this.createParticles(this.player.x + 20, this.player.y + 20, '#ff0099');
+                        if (this.health <= 0) {
+                            this.endGame();
+                            return;
+                        } else {
+                            this.obstacles.splice(i, 1);
+                        }
+                        continue;
+                    }
+
+                    // Scoring
+                    if (obs.y > this.height && !obs.scored) {
+                        obs.scored = true;
+                        this.score += 5;
+                        this.combos++;
+                    }
+
+                    if (obs.y > this.height) {
+                        this.obstacles.splice(i, 1);
+                    }
+                }
+
+                // Update power-ups
+                for (let i = this.powerUps.length - 1; i >= 0; i--) {
+                    const pu = this.powerUps[i];
+                    pu.y += this.speed;
+
+                    if (this.collides(this.player, pu)) {
+                        this.health = Math.min(100, this.health + 30);
+                        this.score += 50;
+                        this.createParticles(pu.x, pu.y, '#00ffff');
+                        this.powerUps.splice(i, 1);
+                        continue;
+                    }
+
+                    if (pu.y > this.height) {
+                        this.powerUps.splice(i, 1);
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life--;
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            },
+
+            spawnObstacle() {
+                const width = 80 + Math.random() * 40;
+                const x = Math.random() * (this.width - width);
+                this.obstacles.push({ x: x, y: -50, width: width, height: 30 });
+            },
+
+            spawnPowerUp() {
+                const x = Math.random() * (this.width - 30);
+                this.powerUps.push({ x: x, y: -30, width: 30, height: 30 });
+            },
+
+            collides(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                       rect1.x + rect1.width > rect2.x &&
+                       rect1.y < rect2.y + rect2.height &&
+                       rect1.y + rect1.height > rect2.y;
+            },
+
+            createParticles(x, y, color) {
+                for (let i = 0; i < 5; i++) {
+                    const angle = (Math.PI * 2 * i) / 5;
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        color: color,
+                        life: 20
+                    });
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+                this.createParticles(this.player.x + 20, this.player.y + 20, '#ff0099');
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('cyberRushHigh', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            movePlayer(dx) {
+                if (this.gameRunning && !this.gamePaused) {
+                    this.player.x = Math.max(0, Math.min(this.width - this.player.width, this.player.x + dx));
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Scanlines effect
+                this.ctx.strokeStyle = 'rgba(0, 221, 255, 0.03)';
+                this.ctx.lineWidth = 1;
+                for (let i = 0; i < this.height; i += 2) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, i);
+                    this.ctx.lineTo(this.width, i);
+                    this.ctx.stroke();
+                }
+
+                // Draw obstacles with glow
+                this.ctx.shadowColor = '#ff0099';
+                this.ctx.shadowBlur = 15;
+                this.ctx.fillStyle = '#ff0099';
+                for (let obs of this.obstacles) {
+                    this.ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                }
+                this.ctx.shadowBlur = 0;
+
+                // Draw power-ups
+                this.ctx.shadowColor = '#00ffff';
+                this.ctx.shadowBlur = 15;
+                this.ctx.fillStyle = '#00ffff';
+                for (let pu of this.powerUps) {
+                    this.ctx.fillRect(pu.x, pu.y, pu.width, pu.height);
+                }
+                this.ctx.shadowBlur = 0;
+
+                // Draw player with glow
+                this.ctx.shadowColor = '#00ddff';
+                this.ctx.shadowBlur = 20;
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.shadowBlur = 0;
+
+                // Draw particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = `rgba(${p.color === '#ff0099' ? '255, 0, 153' : '0, 221, 255'}, ${p.life / 20})`;
+                    this.ctx.fillRect(p.x, p.y, 4, 4);
+                }
+
+                // Draw health bar
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.strokeRect(10, 10, 200, 15);
+                this.ctx.fillStyle = this.health > 50 ? '#00ff00' : this.health > 25 ? '#ffaa00' : '#ff0000';
+                this.ctx.fillRect(10, 10, (200 * this.health) / 100, 15);
+
+                // Score display
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${Math.floor(this.score)}`, 10, 50);
+                this.ctx.fillText(`Level: ${this.level}`, 10, 70);
+                this.ctx.fillText(`Health: ${this.health}%`, 10, 90);
+                this.ctx.fillText(`Combos: ${this.combos}`, 10, 110);
+                this.ctx.fillText(`Speed: ${Math.floor(this.speed * 10) / 10}x`, 10, 130);
+                this.ctx.fillText(`Best: ${this.highScore}`, 10, 150);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ddff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0099';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('CRASHED!', this.width / 2, this.height / 2 - 50);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${Math.floor(this.score)}`, this.width / 2, this.height / 2);
+                    this.ctx.fillText(`Level Reached: ${this.level}`, this.width / 2, this.height / 2 + 25);
+                    this.ctx.fillText(`Total Combos: ${this.combos}`, this.width / 2, this.height / 2 + 50);
+                    this.ctx.fillText(`Best Score: ${this.highScore}`, this.width / 2, this.height / 2 + 75);
+                }
+
+                document.getElementById('score').textContent = Math.floor(this.score);
+            },
+
+            setupInput() {
+                let keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key] = true;
+                    if (['ArrowLeft', 'ArrowRight', 'a', 'A', 'd', 'D'].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key] = false;
+                });
+
+                const checkKeys = () => {
+                    if (keys['ArrowLeft'] || keys['a'] || keys['A']) this.movePlayer(-8);
+                    if (keys['ArrowRight'] || keys['d'] || keys['D']) this.movePlayer(8);
+                };
+
+                setInterval(checkKeys, 30);
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

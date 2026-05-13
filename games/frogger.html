@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FROGGER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ff00;
+            background: #0f3460;
+            display: block;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+        .info {
+            color: #00ff00;
+            min-width: 220px;
+        }
+        .stat-box {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .stat-label { font-size: 11px; margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 8px;
+            background: #00ff00;
+            color: #000;
+            border: 1px solid #00ff00;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 4px 0;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        button:hover { opacity: 0.8; }
+        .controls {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            padding: 10px;
+            font-size: 10px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">LEVEL</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">LIVES</div>
+                <div class="stat-value" id="lives">3</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">TIME</div>
+                <div class="stat-value" id="time">30</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                ARROW KEYS<br/>
+                Move frog<br/>
+                Reach home!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESTART</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 500,
+
+            frog: { x: 8, y: 24, width: 1, height: 1 },
+            cars: [],
+            logs: [],
+            lives: 3,
+            score: 0,
+            level: 1,
+            time: 30,
+            gameRunning: false,
+            gameOver: false,
+            cellSize: 20,
+            timerInterval: null,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.createLanes();
+                this.gameLoop();
+            },
+
+            createLanes() {
+                this.cars = [];
+                this.logs = [];
+
+                // Road lanes with cars
+                const speeds = [2, -2.5, 1.5, -2, 2.5];
+                for (let i = 0; i < 5; i++) {
+                    const laneY = 5 + i * 3;
+                    for (let j = 0; j < 3; j++) {
+                        this.cars.push({
+                            x: j * 15,
+                            y: laneY,
+                            width: 2,
+                            height: 1.5,
+                            speed: speeds[i]
+                        });
+                    }
+                }
+
+                // River lanes with logs
+                const logSpeeds = [1.5, -2, 1.8];
+                for (let i = 0; i < 3; i++) {
+                    const laneY = 12 + i * 3;
+                    for (let j = 0; j < 2; j++) {
+                        this.logs.push({
+                            x: j * 20,
+                            y: laneY,
+                            width: 4,
+                            height: 1,
+                            speed: logSpeeds[i]
+                        });
+                    }
+                }
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                    this.time = 30;
+                    this.timerInterval = setInterval(() => {
+                        this.time--;
+                        if (this.time <= 0) {
+                            this.endLife();
+                        }
+                    }, 1000);
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Update cars
+                for (let car of this.cars) {
+                    car.x += car.speed * 0.05;
+                    if (car.x > 20) car.x = -3;
+                    if (car.x < -3) car.x = 20;
+                }
+
+                // Update logs
+                for (let log of this.logs) {
+                    log.x += log.speed * 0.05;
+                    if (log.x > 20) log.x = -5;
+                    if (log.x < -5) log.x = 20;
+                }
+
+                // Check car collision
+                for (let car of this.cars) {
+                    if (this.frog.y >= car.y - 1 && this.frog.y <= car.y + 1.5 &&
+                        this.frog.x >= car.x - 1 && this.frog.x <= car.x + car.width) {
+                        this.endLife();
+                        return;
+                    }
+                }
+
+                // Check log collision (frog must be on a log)
+                let onLog = false;
+                for (let log of this.logs) {
+                    if (this.frog.y >= log.y - 1 && this.frog.y <= log.y + log.height) {
+                        if (this.frog.x >= log.x - 1 && this.frog.x <= log.x + log.width) {
+                            this.frog.x += log.speed * 0.05;
+                            onLog = true;
+                        }
+                    }
+                }
+
+                // Check if frog drowned
+                if (this.frog.y >= 12 && this.frog.y <= 20 && !onLog) {
+                    this.endLife();
+                    return;
+                }
+
+                // Check water (river without log)
+                if (this.frog.y >= 12 && this.frog.y <= 20 && !onLog) {
+                    this.endLife();
+                    return;
+                }
+
+                // Check goal reached
+                if (this.frog.y < 2) {
+                    this.score += 100;
+                    this.time += 10;
+                    this.frog = { x: 8, y: 24, width: 1, height: 1 };
+                }
+
+                // Check water boundary
+                if (this.frog.y < 0) {
+                    this.endLife();
+                    return;
+                }
+            },
+
+            endLife() {
+                clearInterval(this.timerInterval);
+                this.lives--;
+                if (this.lives <= 0) {
+                    this.gameOver = true;
+                    this.gameRunning = false;
+                } else {
+                    this.frog = { x: 8, y: 24, width: 1, height: 1 };
+                    this.time = 30;
+                    this.gameRunning = false;
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#0f3460';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Road
+                this.ctx.fillStyle = '#333';
+                this.ctx.fillRect(0, this.cellSize * 5, this.width, this.cellSize * 5);
+
+                // River
+                this.ctx.fillStyle = '#006994';
+                this.ctx.fillRect(0, this.cellSize * 12, this.width, this.cellSize * 8);
+
+                // Goal
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(0, 0, this.width, this.cellSize * 2);
+
+                // Cars
+                this.ctx.fillStyle = '#ff0000';
+                for (let car of this.cars) {
+                    this.ctx.fillRect(
+                        car.x * this.cellSize,
+                        car.y * this.cellSize,
+                        car.width * this.cellSize,
+                        car.height * this.cellSize
+                    );
+                }
+
+                // Logs
+                this.ctx.fillStyle = '#8B4513';
+                for (let log of this.logs) {
+                    this.ctx.fillRect(
+                        log.x * this.cellSize,
+                        log.y * this.cellSize,
+                        log.width * this.cellSize,
+                        log.height * this.cellSize
+                    );
+                }
+
+                // Frog
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.beginPath();
+                this.ctx.arc(
+                    (this.frog.x + 0.5) * this.cellSize,
+                    (this.frog.y + 0.5) * this.cellSize,
+                    this.cellSize * 0.4,
+                    0,
+                    Math.PI * 2
+                );
+                this.ctx.fill();
+
+                // HUD
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = '12px monospace';
+                this.ctx.fillText(`Lives: ${this.lives}`, 10, this.height - 10);
+                this.ctx.fillText(`Score: ${this.score}`, 100, this.height - 10);
+                this.ctx.fillText(`Time: ${this.time}s`, 200, this.height - 10);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 20px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                    this.ctx.textAlign = 'left';
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('lives').textContent = this.lives;
+                document.getElementById('time').textContent = this.time;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (!this.gameRunning) {
+                        if (e.key === ' ') this.start();
+                        return;
+                    }
+
+                    switch(e.key) {
+                        case 'ArrowUp': this.frog.y = Math.max(0, this.frog.y - 1); break;
+                        case 'ArrowDown': this.frog.y = Math.min(24, this.frog.y + 1); break;
+                        case 'ArrowLeft': this.frog.x = Math.max(0, this.frog.x - 1); break;
+                        case 'ArrowRight': this.frog.x = Math.min(19, this.frog.x + 1); break;
+                    }
+                });
+            },
+
+            restart() {
+                clearInterval(this.timerInterval);
+                this.frog = { x: 8, y: 24, width: 1, height: 1 };
+                this.lives = 3;
+                this.score = 0;
+                this.level = 1;
+                this.time = 30;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.createLanes();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

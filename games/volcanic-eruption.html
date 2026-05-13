@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOLCANIC ERUPTION - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #4d2817, #2d1810);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { text-align: center; }
+        canvas#gameCanvas {
+            border: 3px solid #fff;
+            background: linear-gradient(to bottom, #ff6600, #cc3300);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 30px rgba(255, 100, 0, 0.8);
+        }
+        h1 { color: #fff; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        .info { color: #fff; margin-top: 20px; font-size: 14px; }
+        .score-display {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin: 10px 0;
+        }
+        .controls { font-size: 12px; margin: 15px 0; color: #eee; }
+        button {
+            padding: 8px 16px;
+            background: #ff5500;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover { background: #ff7700; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌋 VOLCANIC ERUPTION 🌋</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>LEFT/RIGHT ARROW or A/D to move</p>
+                <p>Escape the eruption waves!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+            player: { x: 175, y: 550, width: 25, height: 25, speed: 5 },
+            waves: [],
+            particles: [],
+            score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            frameCount: 0,
+            highScore: localStorage.getItem('volcanic-eruption-high') || 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 550, width: 25, height: 25, speed: 5 };
+                this.waves = [];
+                this.particles = [];
+                this.score = 0;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.frameCount = 0;
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Handle input
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    if (this.player.x > 0) this.player.x -= this.player.speed;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    if (this.player.x + this.player.width < this.width) this.player.x += this.player.speed;
+                }
+
+                // Spawn waves
+                this.frameCount++;
+                const spawnRate = Math.max(30, 70 - Math.floor(this.score / 50) * 5);
+                if (this.frameCount % spawnRate === 0) {
+                    this.waves.push({
+                        x: 0,
+                        y: this.height - 30,
+                        width: this.width,
+                        height: 30,
+                        vy: -(4 + this.score / 150)
+                    });
+                }
+
+                // Update waves
+                for (let i = this.waves.length - 1; i >= 0; i--) {
+                    const wave = this.waves[i];
+                    wave.y += wave.vy;
+
+                    if (wave.y < -30) {
+                        this.waves.splice(i, 1);
+                        this.score++;
+                    } else {
+                        if (this.checkCollision(this.player, wave)) {
+                            this.createExplosion(this.player.x, this.player.y);
+                            this.endGame();
+                        }
+                    }
+                }
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.y += p.vy;
+                    p.vy -= 0.2;
+                    p.life--;
+                    if (p.life <= 0) this.particles.splice(i, 1);
+                }
+            },
+
+            checkCollision(rect, wave) {
+                return rect.x < wave.x + wave.width &&
+                       rect.x + rect.width > wave.x &&
+                       rect.y < wave.y + wave.height &&
+                       rect.y + rect.height > wave.y;
+            },
+
+            createExplosion(x, y) {
+                for (let i = 0; i < 10; i++) {
+                    this.particles.push({
+                        x: x + Math.random() * 20 - 10,
+                        y: y + Math.random() * 20 - 10,
+                        vy: (Math.random() - 0.5) * 4,
+                        life: 40,
+                        color: ['#ff6600', '#ffaa00', '#ffff00'][Math.floor(Math.random() * 3)]
+                    });
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('volcanic-eruption-high', this.highScore);
+                }
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#ff6600');
+                gradient.addColorStop(0.5, '#ff8800');
+                gradient.addColorStop(1, '#cc3300');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw lava at bottom
+                this.ctx.fillStyle = '#ff3300';
+                this.ctx.fillRect(0, this.height - 40, this.width, 40);
+                this.ctx.fillStyle = '#ff6600';
+                for (let i = 0; i < 5; i++) {
+                    this.ctx.fillRect(i * 80, this.height - 20, 40, 20);
+                }
+
+                // Draw waves
+                for (let wave of this.waves) {
+                    this.ctx.fillStyle = 'rgba(255, 100, 0, 0.8)';
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(wave.x, wave.y);
+                    for (let x = wave.x; x <= wave.x + wave.width; x += 10) {
+                        const offset = Math.sin((x / 20) + this.frameCount * 0.1) * 5;
+                        this.ctx.lineTo(x, wave.y + offset);
+                    }
+                    this.ctx.lineTo(wave.x + wave.width, wave.y + wave.height);
+                    this.ctx.lineTo(wave.x, wave.y + wave.height);
+                    this.ctx.fill();
+
+                    // Wave edge highlight
+                    this.ctx.strokeStyle = '#ffff00';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(wave.x, wave.y);
+                    for (let x = wave.x; x <= wave.x + wave.width; x += 10) {
+                        const offset = Math.sin((x / 20) + this.frameCount * 0.1) * 5;
+                        this.ctx.lineTo(x, wave.y + offset);
+                    }
+                    this.ctx.stroke();
+                }
+
+                // Draw particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.globalAlpha = p.life / 40;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+                }
+
+                // Draw player
+                this.ctx.fillStyle = '#0099ff';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.fillStyle = '#00ddff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Score and info
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.font = 'bold 24px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Score: ' + this.score, 10, 30);
+                this.ctx.fillText('High: ' + this.highScore, 10, 55);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 24px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (!this.gameRunning && this.score >= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 28px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('BURNED!', this.width / 2, this.height / 2 - 40);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = '18px Arial';
+                    this.ctx.fillText('Score: ' + this.score, this.width / 2, this.height / 2 + 20);
+                    this.ctx.fillText('High: ' + this.highScore, this.width / 2, this.height / 2 + 50);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

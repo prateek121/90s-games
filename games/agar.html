@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGAR - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #00ff00;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+        .info {
+            color: #00ff00;
+            min-width: 220px;
+        }
+        .stat-box {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .stat-label { font-size: 11px; margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 8px;
+            background: #00ff00;
+            color: #000;
+            border: 1px solid #00ff00;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 4px 0;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        button:hover { opacity: 0.8; }
+        .controls {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            padding: 10px;
+            font-size: 10px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">SIZE</div>
+                <div class="stat-value" id="size">10</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">RANK</div>
+                <div class="stat-value" id="rank">100/100</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score">100</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                MOUSE Move cell<br/>
+                Eat smaller cells<br/>
+                Avoid bigger ones!
+            </div>
+            <button onclick="game.reset()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 600,
+            height: 600,
+
+            player: { x: 300, y: 300, size: 15, color: '#00ff00' },
+            cells: [],
+            food: [],
+            worldSize: 2000,
+            mouseX: 300,
+            mouseY: 300,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.generateWorld();
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            generateWorld() {
+                this.cells = [];
+                this.food = [];
+
+                // Generate enemy cells
+                for (let i = 0; i < 50; i++) {
+                    this.cells.push({
+                        x: Math.random() * this.worldSize,
+                        y: Math.random() * this.worldSize,
+                        size: 10 + Math.random() * 40,
+                        color: `hsl(${Math.random() * 360}, 80%, 50%)`,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2
+                    });
+                }
+
+                // Generate food
+                for (let i = 0; i < 200; i++) {
+                    this.food.push({
+                        x: Math.random() * this.worldSize,
+                        y: Math.random() * this.worldSize,
+                        size: 3,
+                        color: '#ffff00'
+                    });
+                }
+            },
+
+            update() {
+                // Move player towards mouse
+                const dx = this.mouseX - this.player.x;
+                const dy = this.mouseY - this.player.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 5) {
+                    const speed = Math.max(1, 5 - this.player.size / 50);
+                    this.player.x += (dx / dist) * speed;
+                    this.player.y += (dy / dist) * speed;
+                }
+
+                // Keep player in bounds
+                this.player.x = Math.max(this.player.size, Math.min(this.worldSize - this.player.size, this.player.x));
+                this.player.y = Math.max(this.player.size, Math.min(this.worldSize - this.player.size, this.player.y));
+
+                // Move enemy cells
+                for (let cell of this.cells) {
+                    cell.x += cell.vx;
+                    cell.y += cell.vy;
+
+                    if (cell.x < 0 || cell.x > this.worldSize) cell.vx = -cell.vx;
+                    if (cell.y < 0 || cell.y > this.worldSize) cell.vy = -cell.vy;
+
+                    cell.x = Math.max(0, Math.min(this.worldSize, cell.x));
+                    cell.y = Math.max(0, Math.min(this.worldSize, cell.y));
+                }
+
+                // Food collision
+                for (let i = this.food.length - 1; i >= 0; i--) {
+                    const f = this.food[i];
+                    if (Math.hypot(this.player.x - f.x, this.player.y - f.y) < this.player.size) {
+                        this.player.size += 0.5;
+                        this.food.splice(i, 1);
+                        if (this.food.length < 100) {
+                            this.food.push({
+                                x: Math.random() * this.worldSize,
+                                y: Math.random() * this.worldSize,
+                                size: 3,
+                                color: '#ffff00'
+                            });
+                        }
+                    }
+                }
+
+                // Cell collision
+                for (let i = this.cells.length - 1; i >= 0; i--) {
+                    const cell = this.cells[i];
+                    const dist = Math.hypot(this.player.x - cell.x, this.player.y - cell.y);
+                    if (dist < this.player.size + cell.size) {
+                        if (this.player.size > cell.size * 1.1) {
+                            this.player.size += cell.size * 0.3;
+                            this.cells.splice(i, 1);
+                            // Spawn new cell
+                            this.cells.push({
+                                x: Math.random() * this.worldSize,
+                                y: Math.random() * this.worldSize,
+                                size: 10 + Math.random() * 40,
+                                color: `hsl(${Math.random() * 360}, 80%, 50%)`,
+                                vx: (Math.random() - 0.5) * 2,
+                                vy: (Math.random() - 0.5) * 2
+                            });
+                        }
+                    }
+                }
+
+                // Cap size
+                this.player.size = Math.min(200, this.player.size);
+            },
+
+            draw() {
+                const cameraX = this.player.x - this.width / 2;
+                const cameraY = this.player.y - this.height / 2;
+
+                // Background
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Grid
+                this.ctx.strokeStyle = '#222';
+                this.ctx.lineWidth = 1;
+                for (let x = -cameraX % 50; x < this.width; x += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.height);
+                    this.ctx.stroke();
+                }
+                for (let y = -cameraY % 50; y < this.height; y += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.width, y);
+                    this.ctx.stroke();
+                }
+
+                // Draw food
+                for (let f of this.food) {
+                    const x = f.x - cameraX;
+                    const y = f.y - cameraY;
+                    if (x > -10 && x < this.width + 10 && y > -10 && y < this.height + 10) {
+                        this.ctx.fillStyle = f.color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, f.size, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                }
+
+                // Draw enemy cells
+                for (let cell of this.cells) {
+                    const x = cell.x - cameraX;
+                    const y = cell.y - cameraY;
+                    if (x > -cell.size && x < this.width + cell.size && y > -cell.size && y < this.height + cell.size) {
+                        this.ctx.fillStyle = cell.color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, cell.size, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = '#fff';
+                        this.ctx.lineWidth = 1;
+                        this.ctx.stroke();
+                    }
+                }
+
+                // Draw player
+                this.ctx.fillStyle = this.player.color;
+                this.ctx.beginPath();
+                this.ctx.arc(this.width / 2, this.height / 2, this.player.size, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // HUD
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = '12px monospace';
+                this.ctx.fillText(`Size: ${Math.floor(this.player.size)}`, 10, 20);
+
+                // Calculate rank
+                const bigger = this.cells.filter(c => c.size > this.player.size).length + 1;
+                document.getElementById('size').textContent = Math.floor(this.player.size);
+                document.getElementById('rank').textContent = bigger + '/' + this.cells.length;
+                document.getElementById('score').textContent = Math.floor(this.player.size * 10);
+            },
+
+            setupInput() {
+                document.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = this.player.x - this.width / 2 + (e.clientX - rect.left);
+                    this.mouseY = this.player.y - this.height / 2 + (e.clientY - rect.top);
+                });
+            },
+
+            reset() {
+                this.player = { x: 300, y: 300, size: 15, color: '#00ff00' };
+                this.generateWorld();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

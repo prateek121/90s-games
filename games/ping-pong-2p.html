@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PING PONG 2 PLAYER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas#gameCanvas {
+            border: 2px solid #00ff00;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+        }
+        .info {
+            color: #00ff00;
+            min-width: 200px;
+            font-family: monospace;
+        }
+        .score-display {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .controls {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            padding: 10px;
+            font-size: 11px;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        button {
+            width: 100%;
+            padding: 8px;
+            background: #00ff00;
+            color: #000;
+            border: 1px solid #00ff00;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 4px 0;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        button:hover { opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div class="info">
+            <div style="text-align: center; color: #00ff00;">
+                <div style="font-size: 14px;">P1 vs P2</div>
+                <div class="score-display" id="p1Score">0</div>
+                <div style="font-size: 12px; margin-bottom: 10px;">:</div>
+                <div class="score-display" id="p2Score">0</div>
+            </div>
+            <div class="controls">
+                <strong>P1: W/S</strong><br/>
+                <strong>P2: ↑/↓</strong><br/>
+                SPACE - Start<br/>
+                P - Pause
+            </div>
+            <button onclick="game.reset()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 800,
+            height: 400,
+            paddleWidth: 10,
+            paddleHeight: 80,
+            ballSize: 6,
+
+            p1: { x: 20, y: 160 },
+            p2: { x: 770, y: 160 },
+            ball: { x: 400, y: 200, vx: 0, vy: 0 },
+
+            p1Score: 0,
+            p2Score: 0,
+            gameRunning: false,
+            gamePaused: false,
+            ballStarted: false,
+            ballSpeed: 1,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            resetBall() {
+                this.ball.x = this.width / 2;
+                this.ball.y = this.height / 2;
+                this.ball.vx = 0;
+                this.ball.vy = 0;
+                this.ballStarted = false;
+            },
+
+            startBall() {
+                if (!this.ballStarted) {
+                    this.ballStarted = true;
+                    this.gameRunning = true;
+                    this.ball.vx = (Math.random() > 0.5 ? 1 : -1) * 4 * this.ballSpeed;
+                    this.ball.vy = (Math.random() - 0.5) * 3 * this.ballSpeed;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Ball movement
+                this.ball.x += this.ball.vx;
+                this.ball.y += this.ball.vy;
+
+                // Ball collision with top/bottom
+                if (this.ball.y - this.ballSize < 0 || this.ball.y + this.ballSize > this.height) {
+                    this.ball.vy = -this.ball.vy;
+                    this.ball.y = Math.max(this.ballSize, Math.min(this.height - this.ballSize, this.ball.y));
+                }
+
+                // Ball collision with paddles
+                if (this.ball.x - this.ballSize < this.p1.x + this.paddleWidth &&
+                    this.ball.y > this.p1.y && this.ball.y < this.p1.y + this.paddleHeight) {
+                    this.ball.vx = -this.ball.vx;
+                    this.ball.x = this.p1.x + this.paddleWidth + this.ballSize;
+                    const collidePoint = this.ball.y - (this.p1.y + this.paddleHeight / 2);
+                    this.ball.vy = (collidePoint / (this.paddleHeight / 2)) * 5 * this.ballSpeed;
+                }
+
+                if (this.ball.x + this.ballSize > this.p2.x &&
+                    this.ball.y > this.p2.y && this.ball.y < this.p2.y + this.paddleHeight) {
+                    this.ball.vx = -this.ball.vx;
+                    this.ball.x = this.p2.x - this.ballSize;
+                    const collidePoint = this.ball.y - (this.p2.y + this.paddleHeight / 2);
+                    this.ball.vy = (collidePoint / (this.paddleHeight / 2)) * 5 * this.ballSpeed;
+                }
+
+                // Scoring
+                if (this.ball.x < 0) {
+                    this.p2Score++;
+                    this.ballSpeed = 1 + (this.p1Score + this.p2Score) * 0.05;
+                    this.resetBall();
+                    this.gameRunning = false;
+                }
+                if (this.ball.x > this.width) {
+                    this.p1Score++;
+                    this.ballSpeed = 1 + (this.p1Score + this.p2Score) * 0.05;
+                    this.resetBall();
+                    this.gameRunning = false;
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Center line
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.width / 2, 0);
+                this.ctx.lineTo(this.width / 2, this.height);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+
+                // Paddles
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fillRect(this.p1.x, this.p1.y, this.paddleWidth, this.paddleHeight);
+                this.ctx.fillRect(this.p2.x, this.p2.y, this.paddleWidth, this.paddleHeight);
+
+                // Ball
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.ball.x, this.ball.y, this.ballSize, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Score
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = 'bold 40px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(this.p1Score, this.width / 4, 50);
+                this.ctx.fillText(this.p2Score, (this.width * 3) / 4, 50);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ff00';
+                    this.ctx.font = 'bold 30px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                    this.ctx.textAlign = 'left';
+                }
+
+                document.getElementById('p1Score').textContent = this.p1Score;
+                document.getElementById('p2Score').textContent = this.p2Score;
+            },
+
+            setupInput() {
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key.toLowerCase()] = true;
+                    if (e.key === ' ') { this.startBall(); e.preventDefault(); }
+                    if (e.key.toLowerCase() === 'p') {
+                        if (this.gameRunning) this.gamePaused = !this.gamePaused;
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key.toLowerCase()] = false;
+                });
+
+                setInterval(() => {
+                    if (keys['w']) this.p1.y = Math.max(0, this.p1.y - 5);
+                    if (keys['s']) this.p1.y = Math.min(this.height - this.paddleHeight, this.p1.y + 5);
+                    if (keys['arrowup']) this.p2.y = Math.max(0, this.p2.y - 5);
+                    if (keys['arrowdown']) this.p2.y = Math.min(this.height - this.paddleHeight, this.p2.y + 5);
+                }, 20);
+            },
+
+            reset() {
+                this.p1Score = 0;
+                this.p2Score = 0;
+                this.ballSpeed = 1;
+                this.resetBall();
+                this.gameRunning = false;
+                this.gamePaused = false;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECLIPSE RUNNER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: #0f3460;
+            text-shadow: 0 0 15px #00ffff;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        canvas#gameCanvas {
+            border: 4px solid #0f3460;
+            background: linear-gradient(to bottom, #1a1a2e, #16213e);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(15, 52, 96, 0.5);
+        }
+        .info {
+            color: #00ffff;
+            margin-top: 20px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #0099cc;
+        }
+        button {
+            padding: 8px 16px;
+            background: #0f3460;
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        button:hover { background: #16213e; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌙 ECLIPSE RUNNER 🌙</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>ARROW KEYS or A/D to move | SPACE to jump</p>
+                <p>Collect gems and avoid obstacles!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            player: { x: 175, y: 500, width: 30, height: 30, vy: 0, gravity: 0.6, jumping: false },
+            platforms: [],
+            gems: [],
+            obstacles: [],
+            score: 0,
+            level: 1,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            keys: {},
+            cameraY: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.player = { x: 175, y: 500, width: 30, height: 30, vy: 0, gravity: 0.6, jumping: false };
+                this.platforms = [];
+                this.gems = [];
+                this.obstacles = [];
+                this.score = 0;
+                this.level = 1;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.cameraY = 0;
+                this.generateLevel();
+            },
+
+            generateLevel() {
+                this.platforms = [];
+                this.gems = [];
+                this.obstacles = [];
+
+                // Ground
+                this.platforms.push({ x: 0, y: this.height - 30, width: this.width, height: 30 });
+
+                // Generate platform levels
+                for (let i = 1; i < 20; i++) {
+                    const y = this.height - 30 - i * 80;
+                    const x = Math.random() * (this.width - 80);
+                    const width = 60 + Math.random() * 40;
+
+                    this.platforms.push({ x, y, width, height: 20 });
+
+                    // Add gems
+                    if (Math.random() > 0.5) {
+                        this.gems.push({
+                            x: x + width / 2,
+                            y: y - 30,
+                            width: 15,
+                            height: 15,
+                            collected: false
+                        });
+                    }
+
+                    // Add obstacles
+                    if (i > 5 && Math.random() > 0.7) {
+                        this.obstacles.push({
+                            x: x + width / 2 - 15,
+                            y: y - 35,
+                            width: 30,
+                            height: 15,
+                            vx: (Math.random() - 0.5) * 4
+                        });
+                    }
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                // Player movement
+                if (this.keys['ArrowLeft'] || this.keys['a']) {
+                    this.player.x -= 4;
+                }
+                if (this.keys['ArrowRight'] || this.keys['d']) {
+                    this.player.x += 4;
+                }
+
+                // Boundaries
+                if (this.player.x < 0) this.player.x = 0;
+                if (this.player.x + this.player.width > this.width) {
+                    this.player.x = this.width - this.player.width;
+                }
+
+                // Gravity
+                this.player.vy += this.player.gravity;
+                this.player.y += this.player.vy;
+
+                let onPlatform = false;
+
+                // Collision with platforms
+                for (let platform of this.platforms) {
+                    if (this.player.vy >= 0 &&
+                        this.player.y + this.player.height >= platform.y &&
+                        this.player.y + this.player.height <= platform.y + platform.height + 10 &&
+                        this.player.x + this.player.width > platform.x &&
+                        this.player.x < platform.x + platform.width) {
+                        this.player.vy = 0;
+                        this.player.y = platform.y - this.player.height;
+                        this.player.jumping = false;
+                        onPlatform = true;
+                    }
+                }
+
+                // Gem collection
+                for (let gem of this.gems) {
+                    if (!gem.collected &&
+                        this.player.x < gem.x + gem.width &&
+                        this.player.x + this.player.width > gem.x &&
+                        this.player.y < gem.y + gem.height &&
+                        this.player.y + this.player.height > gem.y) {
+                        gem.collected = true;
+                        this.score += 50;
+                    }
+                }
+
+                // Obstacle collision
+                for (let obstacle of this.obstacles) {
+                    obstacle.x += obstacle.vx;
+                    if (obstacle.x < 0 || obstacle.x + obstacle.width > this.width) {
+                        obstacle.vx *= -1;
+                    }
+
+                    if (this.player.x < obstacle.x + obstacle.width &&
+                        this.player.x + this.player.width > obstacle.x &&
+                        this.player.y < obstacle.y + obstacle.height &&
+                        this.player.y + this.player.height > obstacle.y) {
+                        this.endGame();
+                    }
+                }
+
+                // Fall off
+                if (this.player.y > this.height) {
+                    this.endGame();
+                }
+
+                // Level up
+                if (this.player.y < -200) {
+                    this.level++;
+                    this.score += 100;
+                    this.player.y = this.height - 30;
+                    this.generateLevel();
+                }
+
+                // Update camera
+                this.cameraY = Math.max(0, this.player.y - 200);
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                this.ctx.fillStyle = '#1a1a2e';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw grid
+                this.ctx.strokeStyle = 'rgba(15, 52, 96, 0.2)';
+                this.ctx.lineWidth = 1;
+                for (let i = 0; i < this.width; i += 40) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i, 0);
+                    this.ctx.lineTo(i, this.height);
+                    this.ctx.stroke();
+                }
+
+                this.ctx.save();
+                this.ctx.translate(0, -this.cameraY);
+
+                // Platforms
+                this.ctx.fillStyle = '#0f3460';
+                for (let platform of this.platforms) {
+                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    this.ctx.strokeStyle = '#00ffff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                }
+
+                // Gems
+                this.ctx.fillStyle = '#00ff00';
+                for (let gem of this.gems) {
+                    if (!gem.collected) {
+                        this.ctx.fillRect(gem.x - 7, gem.y - 7, gem.width, gem.height);
+                        this.ctx.fillStyle = '#00aa00';
+                        this.ctx.fillRect(gem.x - 5, gem.y - 5, 5, 5);
+                        this.ctx.fillStyle = '#00ff00';
+                    }
+                }
+
+                // Obstacles
+                this.ctx.fillStyle = '#ff0000';
+                for (let obstacle of this.obstacles) {
+                    this.ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                    this.ctx.fillStyle = '#aa0000';
+                    this.ctx.fillRect(obstacle.x + 5, obstacle.y + 3, 8, 8);
+                    this.ctx.fillStyle = '#ff0000';
+                }
+
+                // Player
+                this.ctx.fillStyle = '#00ffff';
+                this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(this.player.x + 5, this.player.y + 5, 8, 8);
+                this.ctx.fillRect(this.player.x + 17, this.player.y + 5, 8, 8);
+
+                this.ctx.restore();
+
+                // HUD
+                this.ctx.fillStyle = '#00ffff';
+                this.ctx.font = 'bold 18px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 30);
+                this.ctx.fillText(`Level: ${this.level}`, 10, 60);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#00ffff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 30);
+                    this.ctx.fillStyle = '#00ffff';
+                    this.ctx.font = '18px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 30);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key.toLowerCase()] = true;
+                    if (e.key === ' ') {
+                        if (!this.player.jumping) {
+                            this.player.vy = -12;
+                            this.player.jumping = true;
+                        }
+                        e.preventDefault();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

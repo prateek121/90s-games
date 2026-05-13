@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PULSE RUNNER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a1a3e 0%, #0f0f2e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff00ff;
+            background: #000;
+            display: block;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.6);
+        }
+        .info {
+            color: #ff00ff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0;
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ff00ff;
+            color: #000;
+            border: 2px solid #ff00ff;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            font-family: monospace;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 0, 255, 0.8); }
+        .controls {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 12px;
+            font-size: 10px;
+            font-family: monospace;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="480" height="480"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Distance</div>
+                <div class="stat-value" id="distance">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                UP/DOWN Move<br/>
+                LEFT/RIGHT Turn<br/>
+                Dodge obstacles!
+            </div>
+            <button onclick="game.start()">START</button>
+            <button onclick="game.restart()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 480,
+            height: 480,
+
+            player: { x: 240, y: 400, radius: 12, angle: 0, speed: 0, maxSpeed: 6 },
+            obstacles: [],
+            powerups: [],
+            particles: [],
+            distance: 0,
+            score: 0,
+            gameRunning: false,
+            gameOver: false,
+            best: localStorage.getItem('pulseRunnerBest') || 0,
+            spawnRate: 0,
+            scrollSpeed: 3,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            setupInput() {
+                const keys = {};
+                document.addEventListener('keydown', (e) => {
+                    keys[e.key] = true;
+                    if (e.key === ' ' && !this.gameRunning && !this.gameOver) {
+                        this.start();
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    keys[e.key] = false;
+                });
+                this.keys = keys;
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            spawnObstacle() {
+                const x = Math.random() * (this.width - 40) + 20;
+                this.obstacles.push({
+                    x: x,
+                    y: -30,
+                    w: 40,
+                    h: 30,
+                    color: `hsl(${Math.random() * 60}, 100%, 50%)`,
+                    speed: this.scrollSpeed + Math.random() * 1
+                });
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Player movement
+                if (this.keys['ArrowLeft']) this.player.angle -= 0.1;
+                if (this.keys['ArrowRight']) this.player.angle += 0.1;
+                if (this.keys['ArrowUp']) this.player.speed = Math.min(this.player.speed + 0.3, this.player.maxSpeed);
+                if (this.keys['ArrowDown']) this.player.speed = Math.max(this.player.speed - 0.3, 0);
+
+                // Apply movement
+                this.player.x += Math.cos(this.player.angle) * this.player.speed;
+                this.player.y += Math.sin(this.player.angle) * this.player.speed;
+
+                // Keep player in bounds
+                this.player.x = Math.max(15, Math.min(this.width - 15, this.player.x));
+                this.player.y = Math.max(15, Math.min(this.height - 15, this.player.y));
+
+                // Spawn obstacles
+                this.spawnRate++;
+                if (this.spawnRate > 30 - this.distance / 100) {
+                    this.spawnObstacle();
+                    this.spawnRate = 0;
+                }
+
+                // Update obstacles
+                this.obstacles = this.obstacles.filter(o => {
+                    o.y += o.speed;
+
+                    // Check collision with player
+                    if (this.player.x < o.x + o.w && this.player.x + this.player.radius > o.x &&
+                        this.player.y < o.y + o.h && this.player.y + this.player.radius > o.y) {
+                        this.gameOver = true;
+                    }
+
+                    return o.y < this.height + 50;
+                });
+
+                // Update particles
+                this.particles = this.particles.filter(p => {
+                    p.life--;
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    return p.life > 0;
+                });
+
+                // Update distance and score
+                this.distance += this.scrollSpeed / 10;
+                this.score += 1;
+
+                if (this.score > this.best) {
+                    this.best = this.score;
+                    localStorage.setItem('pulseRunnerBest', this.best);
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw gradient
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, 'rgba(255, 0, 255, 0.1)');
+                gradient.addColorStop(1, 'rgba(255, 0, 255, 0)');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw obstacles
+                for (let o of this.obstacles) {
+                    this.ctx.fillStyle = o.color;
+                    this.ctx.fillRect(o.x, o.y, o.w, o.h);
+                    this.ctx.strokeStyle = '#fff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(o.x, o.y, o.w, o.h);
+                }
+
+                // Draw player
+                this.ctx.save();
+                this.ctx.translate(this.player.x, this.player.y);
+                this.ctx.rotate(this.player.angle);
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, this.player.radius, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                this.ctx.fillStyle = '#fff';
+                this.ctx.fillRect(-3, -8, 6, 8);
+                this.ctx.restore();
+
+                // Draw particles
+                for (let p of this.particles) {
+                    this.ctx.fillStyle = `rgba(255, 0, 255, ${p.life / 20})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`DIST: ${Math.floor(this.distance)}`, 10, 25);
+                this.ctx.fillText(`SCORE: ${this.score}`, 10, 50);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff00ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('CRASHED!', this.width / 2, this.height / 2);
+                }
+
+                document.getElementById('distance').textContent = Math.floor(this.distance);
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = Math.floor(this.best);
+            },
+
+            restart() {
+                this.player = { x: 240, y: 400, radius: 12, angle: 0, speed: 0, maxSpeed: 6 };
+                this.obstacles = [];
+                this.powerups = [];
+                this.particles = [];
+                this.distance = 0;
+                this.score = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.spawnRate = 0;
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

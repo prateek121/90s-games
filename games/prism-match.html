@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRISM MATCH - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1f0055 0%, #2d004d 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ff00ff;
+            background: #0a0015;
+            display: block;
+            box-shadow: 0 0 25px rgba(255, 0, 255, 0.6);
+        }
+        .info {
+            color: #ff00ff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ff00ff;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 0, 255, 0.1);
+            border: 2px solid #ff00ff;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="480" height="480"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Matches</div>
+                <div class="stat-value" id="matches">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="controls">
+                <strong>RULES:</strong><br/>
+                Click matching<br/>
+                colored prisms<br/>
+                Make pairs fast!
+            </div>
+            <button onclick="game.newGame()">NEW GAME</button>
+            <button onclick="game.reset()">RESET</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 480,
+            height: 480,
+
+            gridSize: 4,
+            tiles: [],
+            selected: [],
+            particles: [],
+            score: 0,
+            matches: 0,
+            level: 1,
+            mistakes: 0,
+            best: localStorage.getItem('prismMatchBest') || 0,
+            gameRunning: false,
+            timeLeft: 60,
+            initialTime: 60,
+            baseTime: 60,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.newGame();
+                this.gameLoop();
+            },
+
+            newGame() {
+                this.createGrid();
+                this.selected = [];
+                this.particles = [];
+                this.score = 0;
+                this.matches = 0;
+                this.mistakes = 0;
+                this.level = Math.floor(this.matches / 4) + 1;
+                this.baseTime = 60 - this.level * 5;
+                this.timeLeft = this.baseTime;
+                this.gameRunning = true;
+
+                const timer = setInterval(() => {
+                    if (this.gameRunning) {
+                        this.timeLeft--;
+                        if (this.timeLeft <= 0) {
+                            this.gameRunning = false;
+                            clearInterval(timer);
+                            if (this.score > this.best) {
+                                this.best = this.score;
+                                localStorage.setItem('prismMatchBest', this.best);
+                            }
+                        }
+                    }
+                }, 1000);
+            },
+
+            createGrid() {
+                const colors = ['#ff0080', '#00ffff', '#ffff00', '#00ff00', '#ff00ff', '#ff0000', '#00ffff', '#ffff00'];
+                this.tiles = [];
+                const tileColors = [...colors, ...colors].sort(() => Math.random() - 0.5);
+
+                for (let i = 0; i < this.gridSize; i++) {
+                    for (let j = 0; j < this.gridSize; j++) {
+                        const idx = i * this.gridSize + j;
+                        this.tiles.push({
+                            x: i,
+                            y: j,
+                            color: tileColors[idx],
+                            matched: false,
+                            revealed: false
+                        });
+                    }
+                }
+            },
+
+            reset() {
+                this.gameRunning = false;
+                this.newGame();
+            },
+
+            selectTile(x, y) {
+                if (!this.gameRunning) return;
+
+                const tile = this.getTile(x, y);
+                if (!tile || tile.matched || tile.revealed) return;
+
+                tile.revealed = true;
+                this.selected.push(tile);
+
+                if (this.selected.length === 2) {
+                    if (this.selected[0].color === this.selected[1].color) {
+                        this.selected[0].matched = true;
+                        this.selected[1].matched = true;
+                        const bonus = Math.max(10, 20 - this.mistakes);
+                        this.score += bonus;
+                        this.matches++;
+                        this.level = Math.floor(this.matches / 4) + 1;
+                        this.createParticles(this.selected[0].x, this.selected[0].y, this.selected[0].color);
+                        this.createParticles(this.selected[1].x, this.selected[1].y, this.selected[1].color);
+                    } else {
+                        this.score = Math.max(0, this.score - 5);
+                        this.mistakes++;
+                    }
+
+                    setTimeout(() => {
+                        this.selected[0].revealed = false;
+                        this.selected[1].revealed = false;
+                        this.selected = [];
+                    }, 500);
+                }
+            },
+
+            createParticles(x, y, color) {
+                for (let i = 0; i < 5; i++) {
+                    const angle = (Math.PI * 2 * i) / 5;
+                    this.particles.push({
+                        x: 20 + x * 110 + 50,
+                        y: 80 + y * 110 + 50,
+                        vx: Math.cos(angle) * 2,
+                        vy: Math.sin(angle) * 2,
+                        color: color,
+                        life: 15
+                    });
+                }
+            },
+
+            getTile(x, y) {
+                for (let tile of this.tiles) {
+                    if (tile.x === x && tile.y === y) return tile;
+                }
+                return null;
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0a0015');
+                gradient.addColorStop(1, '#1a0033');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                const tileSize = 100;
+                const padding = 10;
+                const startX = 20;
+                const startY = 80;
+
+                // Title
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = 'bold 14px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`Prism Match - Level ${this.level}`, this.width / 2, 30);
+
+                // Timer
+                this.ctx.fillStyle = this.timeLeft < 10 ? '#ff0000' : '#ff00ff';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`Time: ${this.timeLeft}s`, this.width / 2, 55);
+
+                // Draw tiles
+                for (let tile of this.tiles) {
+                    const px = startX + tile.x * (tileSize + padding);
+                    const py = startY + tile.y * (tileSize + padding);
+
+                    if (tile.matched) {
+                        this.ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+                        this.ctx.fillRect(px, py, tileSize, tileSize);
+                    } else if (tile.revealed) {
+                        this.ctx.shadowColor = tile.color;
+                        this.ctx.shadowBlur = 15;
+                        this.ctx.fillStyle = tile.color;
+                        this.ctx.fillRect(px, py, tileSize, tileSize);
+                        this.ctx.shadowBlur = 0;
+                    } else {
+                        this.ctx.fillStyle = '#333333';
+                        this.ctx.fillRect(px, py, tileSize, tileSize);
+                    }
+
+                    this.ctx.strokeStyle = '#ff00ff';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(px, py, tileSize, tileSize);
+                }
+
+                // Draw particles
+                this.ctx.fillStyle = '#ff00ff';
+                for (let p of this.particles) {
+                    this.ctx.globalAlpha = p.life / 15;
+                    this.ctx.fillRect(p.x, p.y, 4, 4);
+                }
+                this.ctx.globalAlpha = 1;
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.1;
+                    p.life--;
+                    if (p.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ff00ff';
+                this.ctx.font = '11px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Score: ${this.score}`, 10, this.height - 25);
+                this.ctx.fillText(`Pairs: ${this.matches}`, 10, this.height - 10);
+                this.ctx.fillText(`Mistakes: ${this.mistakes}`, 260, this.height - 25);
+                this.ctx.fillText(`Accuracy: ${this.matches > 0 ? Math.round((this.matches / (this.matches + this.mistakes)) * 100) : 0}%`, 260, this.height - 10);
+
+                if (!this.gameRunning && this.timeLeft <= 0) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff00ff';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('TIME UP!', this.width / 2, this.height / 2 - 40);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2);
+                    this.ctx.fillText(`Pairs Matched: ${this.matches}`, this.width / 2, this.height / 2 + 30);
+                    this.ctx.fillText(`Level: ${this.level}`, this.width / 2, this.height / 2 + 60);
+                    this.ctx.fillText(`Best Score: ${this.best}`, this.width / 2, this.height / 2 + 90);
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('matches').textContent = this.matches;
+                document.getElementById('best').textContent = this.best;
+            },
+
+            setupInput() {
+                document.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+
+                    const startX = 20;
+                    const startY = 80;
+                    const tileSize = 100;
+                    const padding = 10;
+
+                    const gridX = Math.floor((clickX - startX) / (tileSize + padding));
+                    const gridY = Math.floor((clickY - startY) / (tileSize + padding));
+
+                    if (gridX >= 0 && gridX < this.gridSize && gridY >= 0 && gridY < this.gridSize) {
+                        this.selectTile(gridX, gridY);
+                    }
+                });
+            },
+
+            gameLoop() {
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

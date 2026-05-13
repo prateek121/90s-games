@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TITAN CLASH - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #2d2d00, #404000);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 {
+            color: #ffcc00;
+            text-shadow: 0 0 15px #ffcc00;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        canvas#gameCanvas {
+            border: 4px solid #ffcc00;
+            background: linear-gradient(to bottom, #2d2d00, #404000);
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 25px rgba(255, 204, 0, 0.4);
+        }
+        .info {
+            color: #ffcc00;
+            margin-top: 20px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        .score-display {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffcc00;
+            text-shadow: 0 0 15px #ffcc00;
+            margin: 10px 0;
+        }
+        .controls {
+            font-size: 12px;
+            margin: 15px 0;
+            color: #cc9900;
+        }
+        button {
+            padding: 8px 16px;
+            background: #ffcc00;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        button:hover { background: #ffdd33; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚔ TITAN CLASH ⚔</h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="score-display" id="score">0</div>
+            <div class="controls">
+                <p>CLICK to place towers | ARROW KEYS to select tower</p>
+                <p>Defend against waves of enemies!</p>
+            </div>
+            <button onclick="game.togglePause()">PAUSE</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            towers: [],
+            enemies: [],
+            projectiles: [],
+            score: 0,
+            lives: 20,
+            gold: 100,
+            wave: 1,
+            gameRunning: false,
+            gamePaused: false,
+            gameOver: false,
+            frameCount: 0,
+            waveProgress: 0,
+            selectedTower: 1,
+            towersToSpawn: 5,
+            keys: {},
+            path: [{ x: -30, y: 150 }, { x: 100, y: 150 }, { x: 100, y: 300 }, { x: 300, y: 300 }, { x: 300, y: 450 }, { x: 430, y: 450 }],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.startGame();
+                this.gameLoop();
+            },
+
+            startGame() {
+                this.towers = [];
+                this.enemies = [];
+                this.projectiles = [];
+                this.score = 0;
+                this.lives = 20;
+                this.gold = 100;
+                this.wave = 1;
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.gameOver = false;
+                this.frameCount = 0;
+                this.waveProgress = 0;
+                this.towersToSpawn = 5;
+            },
+
+            spawnEnemy() {
+                this.enemies.push({
+                    pathIndex: 0,
+                    distance: 0,
+                    speed: 1 + this.wave * 0.1,
+                    size: 20,
+                    health: 1 + Math.floor(this.wave / 2),
+                    maxHealth: 1 + Math.floor(this.wave / 2)
+                });
+                this.towersToSpawn--;
+            },
+
+            placeTower(x, y) {
+                const cost = this.selectedTower === 1 ? 30 : 50;
+                if (this.gold >= cost) {
+                    let canPlace = true;
+                    for (let tower of this.towers) {
+                        const dx = tower.x - x;
+                        const dy = tower.y - y;
+                        if (Math.sqrt(dx * dx + dy * dy) < 50) {
+                            canPlace = false;
+                            break;
+                        }
+                    }
+
+                    if (canPlace) {
+                        this.towers.push({
+                            x, y,
+                            range: 100,
+                            fireRate: this.selectedTower === 1 ? 30 : 15,
+                            fireCounter: 0,
+                            damage: this.selectedTower === 1 ? 1 : 2,
+                            type: this.selectedTower,
+                            size: 25
+                        });
+                        this.gold -= cost;
+                    }
+                }
+            },
+
+            update() {
+                if (!this.gameRunning || this.gamePaused) return;
+
+                this.frameCount++;
+
+                // Spawn enemies
+                if (this.frameCount % (40 - this.wave * 2) === 0 && this.towersToSpawn > 0) {
+                    this.spawnEnemy();
+                }
+
+                // Update tower fire rates
+                for (let tower of this.towers) {
+                    tower.fireCounter--;
+                }
+
+                // Update enemies
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const enemy = this.enemies[i];
+                    enemy.distance += enemy.speed;
+
+                    const pathLength = this.path.length - 1;
+                    const totalDistance = pathLength * 100;
+
+                    if (enemy.distance > totalDistance) {
+                        this.enemies.splice(i, 1);
+                        this.lives--;
+                        this.score += 5;
+                        if (this.lives <= 0) {
+                            this.endGame();
+                        }
+                        continue;
+                    }
+
+                    // Find position on path
+                    let currentSegment = Math.floor(enemy.distance / 100);
+                    if (currentSegment > pathLength - 1) currentSegment = pathLength - 1;
+
+                    const segmentProgress = (enemy.distance % 100) / 100;
+                    const start = this.path[currentSegment];
+                    const end = this.path[currentSegment + 1];
+                    enemy.x = start.x + (end.x - start.x) * segmentProgress;
+                    enemy.y = start.y + (end.y - start.y) * segmentProgress;
+
+                    // Tower targeting
+                    for (let tower of this.towers) {
+                        const dx = enemy.x - tower.x;
+                        const dy = enemy.y - tower.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < tower.range && tower.fireCounter <= 0) {
+                            this.projectiles.push({
+                                x: tower.x,
+                                y: tower.y,
+                                targetX: enemy.x,
+                                targetY: enemy.y,
+                                speed: 5,
+                                damage: tower.damage,
+                                targetEnemy: enemy
+                            });
+                            tower.fireCounter = tower.fireRate;
+                        }
+                    }
+                }
+
+                // Update projectiles
+                for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                    const proj = this.projectiles[i];
+                    const dx = proj.targetX - proj.x;
+                    const dy = proj.targetY - proj.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < proj.speed) {
+                        proj.targetEnemy.health -= proj.damage;
+                        this.projectiles.splice(i, 1);
+
+                        if (proj.targetEnemy.health <= 0) {
+                            const idx = this.enemies.indexOf(proj.targetEnemy);
+                            if (idx !== -1) {
+                                this.enemies.splice(idx, 1);
+                                this.gold += 10;
+                                this.score += 10;
+                            }
+                        }
+                        continue;
+                    }
+
+                    proj.x += (dx / distance) * proj.speed;
+                    proj.y += (dy / distance) * proj.speed;
+                }
+
+                // Wave complete
+                if (this.enemies.length === 0 && this.towersToSpawn <= 0) {
+                    this.wave++;
+                    this.gold += 50;
+                    this.score += 100;
+                    this.towersToSpawn = 3 + this.wave;
+                }
+            },
+
+            endGame() {
+                this.gameRunning = false;
+                this.gameOver = true;
+            },
+
+            togglePause() {
+                if (this.gameRunning) {
+                    this.gamePaused = !this.gamePaused;
+                } else {
+                    this.startGame();
+                }
+            },
+
+            draw() {
+                // Background
+                this.ctx.fillStyle = '#2d2d00';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw path
+                this.ctx.strokeStyle = '#666600';
+                this.ctx.lineWidth = 40;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.path[0].x, this.path[0].y);
+                for (let i = 1; i < this.path.length; i++) {
+                    this.ctx.lineTo(this.path[i].x, this.path[i].y);
+                }
+                this.ctx.stroke();
+
+                // Draw towers
+                for (let tower of this.towers) {
+                    this.ctx.fillStyle = tower.type === 1 ? '#00ff00' : '#ff6600';
+                    this.ctx.fillRect(tower.x - tower.size / 2, tower.y - tower.size / 2, tower.size, tower.size);
+
+                    // Range indicator
+                    this.ctx.strokeStyle = 'rgba(255, 255, 0, 0.2)';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.beginPath();
+                    this.ctx.arc(tower.x, tower.y, tower.range, 0, Math.PI * 2);
+                    this.ctx.stroke();
+
+                    // Turret
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.fillRect(tower.x - 5, tower.y - 10, 10, 10);
+                }
+
+                // Draw enemies
+                for (let enemy of this.enemies) {
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.fillRect(enemy.x - enemy.size / 2, enemy.y - enemy.size / 2, enemy.size, enemy.size);
+
+                    // Health bar
+                    const healthPercent = enemy.health / enemy.maxHealth;
+                    this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : '#ff0000';
+                    this.ctx.fillRect(enemy.x - 10, enemy.y - 18, 20 * healthPercent, 4);
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.strokeRect(enemy.x - 10, enemy.y - 18, 20, 4);
+                }
+
+                // Draw projectiles
+                for (let proj of this.projectiles) {
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.beginPath();
+                    this.ctx.arc(proj.x, proj.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // HUD
+                this.ctx.fillStyle = '#ffcc00';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Wave: ${this.wave}`, 10, 25);
+                this.ctx.fillText(`Lives: ${this.lives}`, 10, 50);
+                this.ctx.fillText(`Gold: ${this.gold}`, 10, 75);
+                this.ctx.fillText(`Score: ${this.score}`, 10, 100);
+
+                this.ctx.font = '12px monospace';
+                this.ctx.fillText(`1:Gun(30) 2:Cannon(50)`, 10, this.height - 20);
+                this.ctx.fillStyle = this.selectedTower === 1 ? '#00ff00' : '#ffcc00';
+                this.ctx.fillRect(10, this.height - 35, 20, 20);
+                this.ctx.fillStyle = this.selectedTower === 2 ? '#ff6600' : '#ffcc00';
+                this.ctx.fillRect(35, this.height - 35, 20, 20);
+
+                if (this.gamePaused) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffcc00';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('PAUSED', this.width / 2, this.height / 2);
+                }
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ff0000';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 30);
+                    this.ctx.fillStyle = '#ffcc00';
+                    this.ctx.font = '18px monospace';
+                    this.ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 + 30);
+                }
+
+                document.getElementById('score').textContent = this.score;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === '1') this.selectedTower = 1;
+                    if (e.key === '2') this.selectedTower = 2;
+                    this.keys[e.key] = true;
+                });
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                });
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    this.placeTower(x, y);
+                });
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOKOBAN - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: #2c3e50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        h1 { color: white; margin-bottom: 20px; }
+        canvas#gameCanvas {
+            border: 3px solid #3498db;
+            background: #34495e;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        .info {
+            color: white;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .controls {
+            margin: 10px 0;
+            color: #bdc3c7;
+        }
+        button {
+            padding: 8px 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2980b9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 SOKOBAN 📦</h1>
+        <canvas id="gameCanvas" width="320" height="320"></canvas>
+        <div class="info">
+            <div class="controls">
+                <p>ARROW KEYS to move</p>
+                <p>Push all boxes onto goals!</p>
+            </div>
+            <p>Level: <span id="level">1</span> | Moves: <span id="moves">0</span></p>
+            <button onclick="game.reset()">RESTART LEVEL</button>
+            <button onclick="game.nextLevel()">NEXT LEVEL</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const LEVELS = [
+            { width: 8, height: 8, tiles: '........|........|...#....|..###...|.#@.#...|..###...|...#....|........', boxes: [[4, 4]], goals: [[4, 3]] },
+            { width: 10, height: 8, tiles: '........|.......#|#####...|#...#...|#.@.#...|###.##..'.repeat(1), boxes: [[3, 4]], goals: [[4, 4]] },
+            { width: 12, height: 10, tiles: '............|#########..|#..#..@.#|#.$.....#|##.#####.|.......#.'.split('\n'), boxes: [[3, 3], [5, 3]], goals: [[3, 2], [5, 2]] }
+        ];
+
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            currentLevel: 0,
+            width: 0,
+            height: 0,
+            cellSize: 0,
+            grid: [],
+            boxes: [],
+            goals: [],
+            player: { x: 0, y: 0 },
+            moves: 0,
+            gameComplete: false,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.setupInput();
+                this.loadLevel(0);
+                this.gameLoop();
+            },
+
+            loadLevel(levelNum) {
+                this.currentLevel = levelNum % LEVELS.length;
+                const level = LEVELS[this.currentLevel];
+
+                // Simple level creation
+                this.width = 8;
+                this.height = 8;
+                this.cellSize = this.canvas.width / this.width;
+
+                // Initialize grid and objects for this demo
+                this.grid = Array(8).fill().map(() => Array(8).fill(0));
+                this.boxes = [[4, 4]];
+                this.goals = [[4, 3]];
+                this.player = { x: 3, y: 4 };
+                this.moves = 0;
+                this.gameComplete = false;
+            },
+
+            movePlayer(dx, dy) {
+                if (this.gameComplete) return;
+
+                const newX = this.player.x + dx;
+                const newY = this.player.y + dy;
+
+                if (newX < 0 || newX >= this.width || newY < 0 || newY >= this.height) return;
+
+                // Check if pushing a box
+                const boxIndex = this.boxes.findIndex(b => b[0] === newX && b[1] === newY);
+                if (boxIndex !== -1) {
+                    const boxNewX = newX + dx;
+                    const boxNewY = newY + dy;
+                    if (boxNewX < 0 || boxNewX >= this.width || boxNewY < 0 || boxNewY >= this.height) return;
+                    this.boxes[boxIndex] = [boxNewX, boxNewY];
+                }
+
+                this.player.x = newX;
+                this.player.y = newY;
+                this.moves++;
+
+                this.checkWin();
+            },
+
+            checkWin() {
+                const allBoxesOnGoals = this.boxes.every(box =>
+                    this.goals.some(goal => goal[0] === box[0] && goal[1] === box[1])
+                );
+                if (allBoxesOnGoals) {
+                    this.gameComplete = true;
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#34495e';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Draw grid
+                this.ctx.strokeStyle = '#555';
+                this.ctx.lineWidth = 1;
+                for (let x = 0; x <= this.width; x++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x * this.cellSize, 0);
+                    this.ctx.lineTo(x * this.cellSize, this.canvas.height);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y <= this.height; y++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y * this.cellSize);
+                    this.ctx.lineTo(this.canvas.width, y * this.cellSize);
+                    this.ctx.stroke();
+                }
+
+                // Draw goals
+                this.ctx.fillStyle = '#f39c12';
+                for (let goal of this.goals) {
+                    this.ctx.fillRect(goal[0] * this.cellSize + 2, goal[1] * this.cellSize + 2, this.cellSize - 4, this.cellSize - 4);
+                }
+
+                // Draw boxes
+                this.ctx.fillStyle = '#e74c3c';
+                for (let box of this.boxes) {
+                    this.ctx.fillRect(box[0] * this.cellSize + 4, box[1] * this.cellSize + 4, this.cellSize - 8, this.cellSize - 8);
+                }
+
+                // Draw player
+                this.ctx.fillStyle = '#3498db';
+                this.ctx.beginPath();
+                this.ctx.arc(
+                    this.player.x * this.cellSize + this.cellSize / 2,
+                    this.player.y * this.cellSize + this.cellSize / 2,
+                    this.cellSize / 3,
+                    0,
+                    Math.PI * 2
+                );
+                this.ctx.fill();
+
+                if (this.gameComplete) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.fillStyle = '#fff';
+                    this.ctx.font = 'bold 20px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('LEVEL COMPLETE!', this.canvas.width / 2, this.canvas.height / 2);
+                    this.ctx.textAlign = 'left';
+                }
+
+                document.getElementById('level').textContent = this.currentLevel + 1;
+                document.getElementById('moves').textContent = this.moves;
+            },
+
+            setupInput() {
+                document.addEventListener('keydown', (e) => {
+                    switch(e.key) {
+                        case 'ArrowUp': this.movePlayer(0, -1); e.preventDefault(); break;
+                        case 'ArrowDown': this.movePlayer(0, 1); e.preventDefault(); break;
+                        case 'ArrowLeft': this.movePlayer(-1, 0); e.preventDefault(); break;
+                        case 'ArrowRight': this.movePlayer(1, 0); e.preventDefault(); break;
+                    }
+                });
+            },
+
+            reset() {
+                this.loadLevel(this.currentLevel);
+                this.draw();
+            },
+
+            nextLevel() {
+                this.loadLevel(this.currentLevel + 1);
+                this.draw();
+            },
+
+            gameLoop() {
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

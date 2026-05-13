@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Breach - 90s Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            color: #00FF00;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            text-shadow: 0 0 10px #00FF00;
+            letter-spacing: 2px;
+        }
+
+        #gameCanvas {
+            border: 2px solid #00FF00;
+            background: #000;
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1em;
+            text-shadow: 0 0 5px #00FF00;
+        }
+
+        .stat {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 8px 15px;
+            border: 1px solid #00FF00;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00FF00;
+            border-radius: 3px;
+        }
+
+        button {
+            background: #000;
+            color: #00FF00;
+            border: 1px solid #00FF00;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            text-shadow: 0 0 5px #00FF00;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 10px #00FF00;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #000;
+            padding: 30px;
+            border: 2px solid #00FF00;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            border-radius: 3px;
+        }
+
+        .game-over h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00FF00;
+        }
+
+        .game-over p {
+            font-size: 1em;
+            margin: 10px 0;
+            text-shadow: 0 0 5px #00FF00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>> CYBER_BREACH.EXE</h1>
+        <div class="stats">
+            <div class="stat">ACCESS: <span id="access">0</span>%</div>
+            <div class="stat">SCORE: <span id="score">0</span></div>
+            <div class="stat">HACKS: <span id="hacks">0</span></div>
+            <div class="stat">FIREWALLS: <span id="firewalls">1</span></div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div class="controls">
+            <button onclick="togglePause()">PAUSE</button>
+            <button onclick="restartGame()">RESTART</button>
+            <button onclick="goHome()">EXIT</button>
+        </div>
+        <p style="margin-top: 15px; font-size: 0.9em;">Click nodes to hack | Avoid security</p>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h2>> SYSTEM_BREACH</h2>
+        <p>FINAL_ACCESS: <span id="finalScore">0</span>%</p>
+        <p>HACKS_COMPLETED: <span id="finalHacks">0</span></p>
+        <p>FIREWALLS_BREACHED: <span id="finalFirewalls">0</span></p>
+        <button onclick="restartGame()" style="margin-top: 20px;">RETRY</button>
+        <button onclick="goHome()" style="margin-top: 20px;">EXIT</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            access: 0,
+            score: 0,
+            hacks: 0,
+            firewalls: 1,
+            isPaused: false,
+            gameOver: false,
+            time: 0
+        };
+
+        class Node {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = 20;
+                this.hacked = false;
+                this.hackProgress = 0;
+                this.type = Math.random() > 0.7 ? 'firewall' : 'data';
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+
+                if (this.type === 'firewall') {
+                    ctx.fillStyle = this.hacked ? '#00FF00' : '#FF0000';
+                } else {
+                    ctx.fillStyle = this.hacked ? '#00FF00' : '#00FF00';
+                    ctx.globalAlpha = 0.5;
+                }
+
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                ctx.strokeStyle = '#00FF00';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                if (this.hackProgress > 0) {
+                    ctx.strokeStyle = '#00FF00';
+                    ctx.lineWidth = 1;
+                    const progress = (this.hackProgress / 30) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size + 5, -Math.PI / 2, -Math.PI / 2 + progress);
+                    ctx.stroke();
+                }
+            }
+
+            isClicked(x, y) {
+                const dx = this.x - x;
+                const dy = this.y - y;
+                return Math.sqrt(dx * dx + dy * dy) < this.size;
+            }
+        }
+
+        class Virus {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.size = 8;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < this.size || this.x > canvas.width - this.size) this.vx *= -1;
+                if (this.y < this.size || this.y > canvas.height - this.size) this.vy *= -1;
+
+                this.x = Math.max(this.size, Math.min(canvas.width - this.size, this.x));
+                this.y = Math.max(this.size, Math.min(canvas.height - this.size, this.y));
+            }
+
+            draw() {
+                ctx.fillStyle = '#FF0000';
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i / 5) * Math.PI * 2;
+                    const x = this.x + Math.cos(angle) * this.size;
+                    const y = this.y + Math.sin(angle) * this.size;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            collidesWith(x, y, r) {
+                const dx = this.x - x;
+                const dy = this.y - y;
+                return Math.sqrt(dx * dx + dy * dy) < this.size + r;
+            }
+        }
+
+        let nodes = [];
+        let viruses = [];
+
+        function initGame() {
+            nodes = [];
+            viruses = [];
+            game.access = 0;
+            game.score = 0;
+            game.hacks = 0;
+            game.firewalls = 1;
+            game.isPaused = false;
+            game.gameOver = false;
+            game.time = 0;
+
+            for (let i = 0; i < 8; i++) {
+                nodes.push(new Node(
+                    Math.random() * (canvas.width - 80) + 40,
+                    Math.random() * (canvas.height - 80) + 40
+                ));
+            }
+
+            for (let i = 0; i < 2; i++) {
+                viruses.push(new Virus(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height
+                ));
+            }
+        }
+
+        function update() {
+            if (game.gameOver || game.isPaused) return;
+
+            game.time++;
+
+            viruses.forEach(v => v.update());
+
+            nodes.forEach((node, nIdx) => {
+                if (node.hackProgress > 0) {
+                    node.hackProgress++;
+                    if (node.hackProgress > 30) {
+                        node.hacked = true;
+                        node.hackProgress = 0;
+                        game.access += (node.type === 'firewall' ? 25 : 10);
+                        game.score += (node.type === 'firewall' ? 100 : 25);
+                        if (node.type === 'firewall') {
+                            game.firewalls++;
+                        }
+                        game.hacks++;
+                    }
+                }
+
+                viruses.forEach((virus, vIdx) => {
+                    if (virus.collidesWith(node.x, node.y, node.size)) {
+                        if (!node.hacked) {
+                            endGame();
+                        }
+                    }
+                });
+            });
+
+            if (game.time % 150 === 0 && viruses.length < 5) {
+                viruses.push(new Virus(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height
+                ));
+            }
+
+            if (game.access >= 100) {
+                endGame();
+            }
+
+            updateUI();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.2)';
+            ctx.lineWidth = 1;
+            nodes.forEach((n1, i) => {
+                nodes.slice(i + 1).forEach(n2 => {
+                    ctx.beginPath();
+                    ctx.moveTo(n1.x, n1.y);
+                    ctx.lineTo(n2.x, n2.y);
+                    ctx.stroke();
+                });
+            });
+
+            nodes.forEach(node => node.draw());
+            viruses.forEach(virus => virus.draw());
+
+            ctx.fillStyle = '#00FF00';
+            ctx.font = 'bold 11px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText('>> SYSTEM_MONITORING_ACTIVE', 10, 25);
+        }
+
+        function updateUI() {
+            document.getElementById('access').textContent = Math.min(100, game.access);
+            document.getElementById('score').textContent = game.score;
+            document.getElementById('hacks').textContent = game.hacks;
+            document.getElementById('firewalls').textContent = game.firewalls;
+        }
+
+        function endGame() {
+            game.gameOver = true;
+            document.getElementById('finalScore').textContent = game.access;
+            document.getElementById('finalHacks').textContent = game.hacks;
+            document.getElementById('finalFirewalls').textContent = game.firewalls;
+            document.getElementById('gameOverScreen').style.display = 'block';
+            saveScore();
+        }
+
+        function togglePause() {
+            game.isPaused = !game.isPaused;
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            initGame();
+        }
+
+        function goHome() {
+            window.location.href = '/90s-games/';
+        }
+
+        function saveScore() {
+            let scores = JSON.parse(localStorage.getItem('cyberBreachScores') || '[]');
+            scores.push({ score: game.score, hacks: game.hacks, access: game.access, date: new Date().toISOString() });
+            scores.sort((a, b) => b.score - a.score);
+            localStorage.setItem('cyberBreachScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (!game.gameOver && !game.isPaused) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                nodes.forEach(node => {
+                    if (node.isClicked(x, y) && !node.hacked) {
+                        node.hackProgress = 1;
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

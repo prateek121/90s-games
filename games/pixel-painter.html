@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIXEL PAINTER - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .canvas-wrapper {
+            border: 3px solid #fff;
+            background: #fff;
+            display: block;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        canvas#gameCanvas {
+            display: block;
+            image-rendering: pixelated;
+        }
+        .info {
+            color: #fff;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #fff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .color-btn {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .color-btn.active {
+            border-color: #fff;
+            transform: scale(1.1);
+        }
+        .color-btn:hover {
+            transform: scale(1.05);
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #fff;
+            color: #667eea;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+        </div>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Pixels</div>
+                <div class="stat-value" id="pixels">0/1600</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Progress</div>
+                <div class="stat-value" id="progress">0%</div>
+            </div>
+            <div class="color-palette" id="colorPalette"></div>
+            <button onclick="game.undo()">UNDO</button>
+            <button onclick="game.clear()">CLEAR</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 400,
+            pixelSize: 10,
+            gridWidth: 40,
+            gridHeight: 40,
+
+            grid: [],
+            selectedColor: '#000000',
+            colors: ['#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff6600', '#ff0099', '#00ff99', '#ffff00'],
+            history: [],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.initializeGrid();
+                this.setupInput();
+                this.renderColorPalette();
+                this.draw();
+            },
+
+            initializeGrid() {
+                this.grid = Array(this.gridHeight).fill(null).map(() => Array(this.gridWidth).fill(null));
+            },
+
+            renderColorPalette() {
+                const palette = document.getElementById('colorPalette');
+                palette.innerHTML = '';
+                this.colors.forEach(color => {
+                    const btn = document.createElement('div');
+                    btn.className = 'color-btn';
+                    btn.style.backgroundColor = color;
+                    if (color === this.selectedColor) {
+                        btn.classList.add('active');
+                    }
+                    btn.onclick = () => this.selectColor(color);
+                    palette.appendChild(btn);
+                });
+            },
+
+            selectColor(color) {
+                this.selectedColor = color;
+                this.renderColorPalette();
+            },
+
+            paintPixel(x, y) {
+                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
+                    const oldColor = this.grid[y][x];
+                    this.grid[y][x] = this.selectedColor;
+                    this.history.push({ x, y, oldColor });
+                    this.updateStats();
+                }
+            },
+
+            undo() {
+                if (this.history.length > 0) {
+                    const action = this.history.pop();
+                    this.grid[action.y][action.x] = action.oldColor;
+                    this.updateStats();
+                }
+            },
+
+            clear() {
+                this.history = [];
+                this.initializeGrid();
+                this.updateStats();
+            },
+
+            updateStats() {
+                const pixelsUsed = this.grid.flat().filter(p => p !== null).length;
+                const total = this.gridWidth * this.gridHeight;
+                const progress = Math.round((pixelsUsed / total) * 100);
+                document.getElementById('pixels').textContent = `${pixelsUsed}/${total}`;
+                document.getElementById('progress').textContent = `${progress}%`;
+            },
+
+            draw() {
+                this.ctx.fillStyle = '#fff';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Draw grid
+                this.ctx.strokeStyle = '#ddd';
+                this.ctx.lineWidth = 0.5;
+                for (let i = 1; i < this.gridWidth; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i * this.pixelSize, 0);
+                    this.ctx.lineTo(i * this.pixelSize, this.height);
+                    this.ctx.stroke();
+                }
+                for (let i = 1; i < this.gridHeight; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, i * this.pixelSize);
+                    this.ctx.lineTo(this.width, i * this.pixelSize);
+                    this.ctx.stroke();
+                }
+
+                // Draw pixels
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        const color = this.grid[y][x];
+                        if (color) {
+                            this.ctx.fillStyle = color;
+                            this.ctx.fillRect(x * this.pixelSize, y * this.pixelSize, this.pixelSize, this.pixelSize);
+                        }
+                    }
+                }
+
+                requestAnimationFrame(() => this.draw());
+            },
+
+            setupInput() {
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = Math.floor((e.clientX - rect.left) / this.pixelSize);
+                    const y = Math.floor((e.clientY - rect.top) / this.pixelSize);
+                    this.paintPixel(x, y);
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (e.buttons === 1) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        const x = Math.floor((e.clientX - rect.left) / this.pixelSize);
+                        const y = Math.floor((e.clientY - rect.top) / this.pixelSize);
+                        this.paintPixel(x, y);
+                    }
+                });
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

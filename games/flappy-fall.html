@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLAPPY FALL - 90s Games</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        canvas#gameCanvas {
+            border: 3px solid #ffff00;
+            background: linear-gradient(to bottom, #0a0a1a, #1a1a3e);
+            display: block;
+            box-shadow: 0 0 20px rgba(255, 255, 0, 0.5);
+        }
+        .info {
+            color: #ffff00;
+            min-width: 250px;
+        }
+        .stat-box {
+            background: rgba(255, 255, 0, 0.1);
+            border: 2px solid #ffff00;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-size: 28px; font-family: monospace; font-weight: bold; }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #ffff00;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        button:hover { transform: scale(1.05); }
+        .controls {
+            background: rgba(255, 255, 0, 0.1);
+            border: 2px solid #ffff00;
+            padding: 12px;
+            font-size: 11px;
+            border-radius: 4px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="info">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Best</div>
+                <div class="stat-value" id="best">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Platforms</div>
+                <div class="stat-value" id="platforms">0</div>
+            </div>
+            <div class="controls">
+                <strong>CONTROLS:</strong><br/>
+                CLICK to fall<br/>
+                RELEASE to jump<br/>
+                Land on platforms!
+            </div>
+            <button onclick="game.start()">START GAME</button>
+            <button onclick="game.restart()">NEW GAME</button>
+            <button onclick="location.href='../'">BACK</button>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            canvas: document.getElementById('gameCanvas'),
+            ctx: null,
+            width: 400,
+            height: 600,
+
+            player: { x: 200, y: 500, width: 20, height: 20, vy: 0, jumping: false, mouseDown: false },
+            platforms: [],
+            score: 0,
+            best: localStorage.getItem('flappyFallBest') || 0,
+            gameRunning: false,
+            gameOver: false,
+            gravity: 0.5,
+            jumpPower: 12,
+            platformCount: 0,
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.generatePlatforms();
+                this.setupInput();
+                this.gameLoop();
+            },
+
+            generatePlatforms() {
+                this.platforms = [];
+                this.platformCount = 0;
+                for (let i = 0; i < 12; i++) {
+                    this.platforms.push({
+                        x: Math.random() * (this.width - 80),
+                        y: 550 - i * 50,
+                        width: 80,
+                        height: 12,
+                        width_change: 0,
+                        type: Math.random() > 0.7 ? 'disappearing' : 'normal'
+                    });
+                }
+            },
+
+            start() {
+                if (!this.gameRunning && !this.gameOver) {
+                    this.gameRunning = true;
+                }
+            },
+
+            update() {
+                if (!this.gameRunning) return;
+
+                // Jump control
+                if (this.player.mouseDown) {
+                    this.player.vy = this.jumpPower; // Hold to jump higher
+                }
+
+                // Gravity
+                this.player.vy -= this.gravity;
+                this.player.y -= this.player.vy;
+
+                // Horizontal movement
+                if (this.player.x < 0) this.player.x = this.width;
+                if (this.player.x > this.width) this.player.x = 0;
+
+                // Platform collision
+                for (let platform of this.platforms) {
+                    if (this.player.vy < 0 &&
+                        this.player.y + this.player.height > platform.y &&
+                        this.player.y + this.player.height < platform.y + platform.height + 15 &&
+                        this.player.x + this.player.width > platform.x &&
+                        this.player.x < platform.x + platform.width) {
+                        this.player.vy = 0;
+                        this.score++;
+                        this.platformCount++;
+
+                        if (platform.type === 'disappearing') {
+                            const idx = this.platforms.indexOf(platform);
+                            this.platforms.splice(idx, 1);
+                        }
+                    }
+                }
+
+                // Fall off screen
+                if (this.player.y > this.height) {
+                    this.gameOver = true;
+                    this.gameRunning = false;
+                    if (this.score > this.best) {
+                        this.best = this.score;
+                        localStorage.setItem('flappyFallBest', this.best);
+                    }
+                }
+
+                // Scroll platforms
+                if (this.player.y < 200) {
+                    const diff = 200 - this.player.y;
+                    this.player.y = 200;
+
+                    for (let platform of this.platforms) {
+                        platform.y += diff;
+                    }
+
+                    // Add new platforms
+                    for (let platform of this.platforms) {
+                        if (platform.y > this.height) {
+                            platform.y = -50;
+                            platform.x = Math.random() * (this.width - platform.width);
+                            platform.type = Math.random() > 0.7 ? 'disappearing' : 'normal';
+                        }
+                    }
+                }
+            },
+
+            draw() {
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+                gradient.addColorStop(0, '#0a0a1a');
+                gradient.addColorStop(1, '#1a1a3e');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // Stars
+                this.ctx.fillStyle = '#fff';
+                for (let i = 0; i < 30; i++) {
+                    const x = (i * 137) % this.width;
+                    const y = (i * 97) % this.height;
+                    this.ctx.fillRect(x, y, 1, 1);
+                }
+
+                // Platforms
+                for (let platform of this.platforms) {
+                    if (platform.type === 'disappearing') {
+                        this.ctx.fillStyle = '#ff4444';
+                    } else {
+                        this.ctx.fillStyle = '#44ff44';
+                    }
+                    this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    this.ctx.strokeStyle = '#ffff00';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                }
+
+                // Player
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.beginPath();
+                this.ctx.arc(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2, this.player.width / 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // Eyes
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(this.player.x + 5, this.player.y + 5, 3, 3);
+                this.ctx.fillRect(this.player.x + 12, this.player.y + 5, 3, 3);
+
+                // HUD
+                this.ctx.fillStyle = '#ffff00';
+                this.ctx.font = 'bold 16px monospace';
+                this.ctx.fillText(`Score: ${this.score}`, 10, 25);
+
+                if (this.gameOver) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    this.ctx.fillRect(0, 0, this.width, this.height);
+                    this.ctx.fillStyle = '#ffff00';
+                    this.ctx.font = 'bold 24px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GAME OVER', this.width / 2, this.height / 2);
+                    this.ctx.font = '14px monospace';
+                    this.ctx.fillText(`Score: ${this.score}`, this.width / 2, this.height / 2 + 40);
+                    this.ctx.textAlign = 'left';
+                }
+
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('best').textContent = this.best;
+                document.getElementById('platforms').textContent = this.platformCount;
+            },
+
+            setupInput() {
+                document.addEventListener('mousedown', () => {
+                    if (this.gameRunning) {
+                        this.player.mouseDown = true;
+                    } else if (!this.gameOver) {
+                        this.start();
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    this.player.mouseDown = false;
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === ' ') {
+                        if (this.gameRunning) {
+                            this.player.mouseDown = true;
+                        } else if (!this.gameOver) {
+                            this.start();
+                        }
+                        e.preventDefault();
+                    }
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    if (e.key === ' ') {
+                        this.player.mouseDown = false;
+                    }
+                });
+            },
+
+            restart() {
+                this.player = { x: 200, y: 500, width: 20, height: 20, vy: 0, jumping: false, mouseDown: false };
+                this.score = 0;
+                this.gameRunning = false;
+                this.gameOver = false;
+                this.platformCount = 0;
+                this.generatePlatforms();
+                this.draw();
+            },
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chip-Tune Battle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(45deg, #330033, #003333);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            background: linear-gradient(to bottom, #000, #330033);
+            border: 4px solid #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), inset 0 0 20px rgba(0, 255, 255, 0.1);
+            padding: 20px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+            margin-bottom: 10px;
+            font-size: 2em;
+            letter-spacing: 2px;
+        }
+
+        .battle-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .player-stats {
+            border: 2px solid #00ffff;
+            padding: 10px;
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        .enemy-stats {
+            border: 2px solid #ff00ff;
+            padding: 10px;
+            background: rgba(255, 0, 255, 0.1);
+        }
+
+        .stat-row {
+            color: #00ffff;
+            font-size: 0.9em;
+            margin: 5px 0;
+        }
+
+        .enemy-stat-row {
+            color: #ff00ff;
+        }
+
+        .hp-bar {
+            width: 100%;
+            height: 15px;
+            background: #000;
+            border: 1px solid #00ffff;
+            margin: 5px 0;
+            position: relative;
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: #00ff00;
+            transition: width 0.3s;
+        }
+
+        .enemy-hp-bar {
+            border-color: #ff00ff;
+        }
+
+        .enemy-hp-fill {
+            background: #ff0000;
+        }
+
+        canvas {
+            background: #000;
+            border: 3px solid #00ffff;
+            display: block;
+            margin: 15px auto;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+
+        .controls {
+            color: #00ffff;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+
+        button {
+            background: #00ffff;
+            color: #000;
+            border: none;
+            padding: 8px 20px;
+            margin: 3px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover:not(:disabled) {
+            background: #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+        }
+
+        .message {
+            color: #ffff00;
+            font-size: 1.1em;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #ffff00;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CHIP-TUNE BATTLE</h1>
+
+        <div class="battle-info">
+            <div class="player-stats">
+                <div style="color: #00ffff; font-weight: bold;">PLAYER</div>
+                <div class="stat-row">
+                    <div>Level: <span id="playerLevel">1</span></div>
+                </div>
+                <div class="hp-bar">
+                    <div class="hp-fill" id="playerHP" style="width: 100%;"></div>
+                </div>
+                <div class="stat-row">
+                    <div><span id="playerHPText">100</span>/100</div>
+                </div>
+            </div>
+
+            <div class="enemy-stats">
+                <div style="color: #ff00ff; font-weight: bold;">ENEMY</div>
+                <div class="stat-row enemy-stat-row">
+                    <div>Level: <span id="enemyLevel">1</span></div>
+                </div>
+                <div class="hp-bar enemy-hp-bar">
+                    <div class="hp-fill enemy-hp-fill" id="enemyHP" style="width: 100%;"></div>
+                </div>
+                <div class="stat-row enemy-stat-row">
+                    <div><span id="enemyHPText">80</span>/80</div>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="500" height="200"></canvas>
+
+        <div id="message" class="message"></div>
+
+        <div class="action-buttons">
+            <button id="attackBtn" onclick="battle.playerAttack()">ATTACK</button>
+            <button id="defendBtn" onclick="battle.playerDefend()">DEFEND</button>
+        </div>
+
+        <div class="controls">
+            <p>Click buttons to battle. Defeat enemies to level up!</p>
+        </div>
+
+        <button id="startBtn" onclick="battle.start()">START BATTLE</button>
+        <button onclick="location.reload()">RESET</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const battle = {
+            running: false,
+            turn: 0,
+            battles: 0,
+
+            player: {
+                level: 1,
+                maxHP: 100,
+                hp: 100,
+                attack: 15,
+                defense: 5,
+                defending: false
+            },
+
+            enemy: {
+                level: 1,
+                maxHP: 80,
+                hp: 80,
+                attack: 12,
+                defense: 3,
+                defending: false
+            },
+
+            messages: [],
+            particles: [],
+
+            init() {
+                // No external input needed for this turn-based game
+            },
+
+            start() {
+                this.running = true;
+                this.turn = 0;
+                this.battles = 0;
+                this.player.level = 1;
+                this.player.hp = this.player.maxHP = 100;
+                this.player.attack = 15;
+                this.player.defense = 5;
+                this.newBattle();
+                document.getElementById('startBtn').disabled = true;
+                this.update();
+            },
+
+            newBattle() {
+                this.battles++;
+                this.enemy.level = Math.floor(this.player.level + Math.random() * 2);
+                this.enemy.maxHP = 80 + this.enemy.level * 10;
+                this.enemy.hp = this.enemy.maxHP;
+                this.enemy.attack = 12 + this.enemy.level * 2;
+                this.enemy.defense = 3 + this.enemy.level;
+                this.messages = ['New enemy approaches!'];
+                this.turn = 0;
+                this.updateUI();
+            },
+
+            playerAttack() {
+                if (!this.running || this.turn > 0) return;
+                this.turn = 1;
+
+                const damage = Math.max(5, this.player.attack + Math.floor(Math.random() * 10) - this.enemy.defense);
+                this.enemy.hp -= damage;
+                this.messages.push('You attack for ' + damage + ' damage!');
+                this.createParticles(350, 100, '#00ff00');
+
+                setTimeout(() => this.enemyTurn(), 500);
+            },
+
+            playerDefend() {
+                if (!this.running || this.turn > 0) return;
+                this.turn = 1;
+
+                this.player.defending = true;
+                this.messages.push('You defend!');
+                this.createParticles(150, 100, '#0099ff');
+
+                setTimeout(() => this.enemyTurn(), 500);
+            },
+
+            enemyTurn() {
+                if (!this.running) return;
+
+                this.enemy.defending = false;
+                const action = Math.random() > 0.3 ? 'attack' : 'defend';
+
+                if (action === 'attack') {
+                    let damage = Math.max(3, this.enemy.attack + Math.floor(Math.random() * 8) - this.player.defense);
+                    if (this.player.defending) {
+                        damage = Math.floor(damage * 0.4);
+                        this.messages.push('Enemy attacks, you block ' + damage + ' damage!');
+                    } else {
+                        this.messages.push('Enemy attacks for ' + damage + ' damage!');
+                    }
+                    this.player.hp -= damage;
+                    this.createParticles(150, 100, '#ff0000');
+                } else {
+                    this.enemy.defending = true;
+                    this.messages.push('Enemy defends!');
+                    this.createParticles(350, 100, '#ff00ff');
+                }
+
+                this.player.defending = false;
+                this.turn = 0;
+
+                setTimeout(() => this.checkBattle(), 1000);
+            },
+
+            checkBattle() {
+                this.updateUI();
+
+                if (this.enemy.hp <= 0) {
+                    this.messages.push('Victory! +100 EXP');
+                    this.player.level++;
+                    this.player.attack += 3;
+                    this.player.defense += 1;
+                    this.player.hp = this.player.maxHP;
+
+                    setTimeout(() => {
+                        if (this.player.level < 10) {
+                            this.newBattle();
+                        } else {
+                            this.running = false;
+                            document.getElementById('message').textContent = 'MAX LEVEL! Battles: ' + this.battles;
+                            document.getElementById('startBtn').disabled = false;
+                        }
+                    }, 1000);
+                } else if (this.player.hp <= 0) {
+                    this.running = false;
+                    document.getElementById('message').textContent = 'DEFEATED! Level: ' + this.player.level + ' | Battles: ' + this.battles;
+                    document.getElementById('startBtn').disabled = false;
+                    this.saveScore();
+                }
+            },
+
+            createParticles(x, y, color) {
+                for (let i = 0; i < 5; i++) {
+                    this.particles.push({
+                        x,
+                        y,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: (Math.random() - 0.5) * 4 - 1,
+                        life: 20,
+                        color
+                    });
+                }
+            },
+
+            update() {
+                if (!this.running) return;
+
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    this.particles[i].x += this.particles[i].vx;
+                    this.particles[i].y += this.particles[i].vy;
+                    this.particles[i].life--;
+                    if (this.particles[i].life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                this.draw();
+                requestAnimationFrame(() => this.update());
+            },
+
+            draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw player character
+                ctx.fillStyle = '#00ffff';
+                ctx.fillRect(50, 80, 40, 60);
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(70, 60, 15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw enemy character
+                ctx.fillStyle = '#ff00ff';
+                ctx.fillRect(410, 80, 40, 60);
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(430, 60, 15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw status effects
+                if (this.player.defending) {
+                    ctx.strokeStyle = '#0099ff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(45, 75, 50, 70);
+                }
+
+                if (this.enemy.defending) {
+                    ctx.strokeStyle = '#ff00ff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(405, 75, 50, 70);
+                }
+
+                // Draw particles
+                for (const p of this.particles) {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life / 20;
+                    ctx.fillRect(p.x, p.y, 4, 4);
+                    ctx.globalAlpha = 1;
+                }
+
+                // Draw messages
+                ctx.fillStyle = '#00ffff';
+                ctx.font = 'bold 12px Courier New';
+                ctx.textAlign = 'center';
+                let messageY = 20;
+                for (let i = Math.max(0, this.messages.length - 2); i < this.messages.length; i++) {
+                    ctx.fillText(this.messages[i], canvas.width / 2, messageY);
+                    messageY += 15;
+                }
+            },
+
+            updateUI() {
+                document.getElementById('playerLevel').textContent = this.player.level;
+                document.getElementById('playerHPText').textContent = Math.max(0, this.player.hp);
+                const playerHPPercent = Math.max(0, this.player.hp / this.player.maxHP * 100);
+                document.getElementById('playerHP').style.width = playerHPPercent + '%';
+
+                document.getElementById('enemyLevel').textContent = this.enemy.level;
+                document.getElementById('enemyHPText').textContent = Math.max(0, this.enemy.hp);
+                const enemyHPPercent = Math.max(0, this.enemy.hp / this.enemy.maxHP * 100);
+                document.getElementById('enemyHP').style.width = enemyHPPercent + '%';
+            },
+
+            saveScore() {
+                let scores = JSON.parse(localStorage.getItem('battleScores') || '[]');
+                scores.push({ level: this.player.level, battles: this.battles, date: new Date().toLocaleDateString() });
+                scores.sort((a, b) => b.level - a.level);
+                localStorage.setItem('battleScores', JSON.stringify(scores.slice(0, 10)));
+            }
+        };
+
+        battle.init();
+    </script>
+</body>
+</html>
