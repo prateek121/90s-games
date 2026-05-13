@@ -5,6 +5,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Made with: HTML5 + Vanilla JS](https://img.shields.io/badge/HTML5-Vanilla%20JS-orange)](#)
 [![Dependencies: None](https://img.shields.io/badge/dependencies-none-brightgreen)](#)
+[![Deploy: GitHub Pages](https://img.shields.io/badge/Play-Online-blue)](https://prateek121.github.io/90s-games/)
+
+## 🎮 Play online
+
+**[Open the live arcade →](https://prateek121.github.io/90s-games/)**
+
+<!-- Drop a screenshot or GIF here. Suggested: 1200×630 PNG of the index page, or an animated GIF of one game in action. -->
+<!-- ![90s Games preview](docs/preview.png) -->
 
 ## What's inside
 
