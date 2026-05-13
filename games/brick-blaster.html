@@ -142,7 +142,8 @@
             },
 
             start() {
-                if (!this.gameRunning && !this.gameOver) {
+                if (this.gameOver) return;
+                if (!this.ball.fired) {
                     this.gameRunning = true;
                     this.ball.fired = true;
                     const angle = (this.mouseX - this.ball.x) / 50;
@@ -320,7 +321,7 @@
                 });
 
                 document.addEventListener('mousedown', () => {
-                    if (!this.gameRunning && !this.gameOver) {
+                    if (!this.gameOver && !this.ball.fired) {
                         this.start();
                     }
                 });

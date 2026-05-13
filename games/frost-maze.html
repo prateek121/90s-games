@@ -218,7 +218,9 @@
                 this.keys = {};
                 document.addEventListener('keydown', (e) => {
                     this.keys[e.key] = true;
-                    e.preventDefault();
+                    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) {
+                        e.preventDefault();
+                    }
                 });
                 document.addEventListener('keyup', (e) => {
                     this.keys[e.key] = false;

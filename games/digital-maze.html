@@ -219,7 +219,7 @@
             }
         }
 
-        function initGame() {
+        function initGame(fullReset = true) {
             const mazeWidth = 15;
             const mazeHeight = 10;
             maze = generateMaze(mazeWidth, mazeHeight);
@@ -239,10 +239,12 @@
                 enemies.push(new Enemy(ex, ey));
             }
 
-            game.circuits = 0;
-            game.score = 0;
+            if (fullReset) {
+                game.circuits = 0;
+                game.score = 0;
+                game.level = 1;
+            }
             game.time = 0;
-            game.level = 1;
             game.isPaused = false;
             game.gameOver = false;
         }
@@ -276,7 +278,7 @@
                 game.level++;
                 game.score += 500 + game.time * 2;
                 game.time = 0;
-                initGame();
+                initGame(false);
             }
 
             updateUI();

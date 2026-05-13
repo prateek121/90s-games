@@ -164,7 +164,8 @@
             },
 
             start() {
-                if (!this.gameRunning && !this.ballLaunched) {
+                if (this.gameOver) return;
+                if (!this.ballLaunched) {
                     this.ballLaunched = true;
                     this.gameRunning = true;
                     this.ball.vx = (Math.random() - 0.5) * 4;

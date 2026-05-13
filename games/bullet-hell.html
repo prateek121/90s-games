@@ -316,6 +316,13 @@
                     return !bullet.isOffScreen();
                 });
 
+                this.waveTimer++;
+                if (this.waveTimer % 6 === 0) this.score++;
+                if (this.waveTimer > 60 * 20) {
+                    this.waveTimer = 0;
+                    this.nextWave();
+                }
+
                 if (this.enemies.length === 0) {
                     this.nextWave();
                 }
