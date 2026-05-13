@@ -186,15 +186,6 @@
             update() {
                 if (!this.gameRunning) return;
 
-                const keys = {};
-                document.addEventListener('keydown', (e) => {
-                    keys[e.key] = true;
-                });
-
-                document.addEventListener('keyup', (e) => {
-                    keys[e.key] = false;
-                });
-
                 // Check exits
                 for (let exit of this.exits) {
                     if (!exit.found && this.player.x === exit.x && this.player.y === exit.y) {

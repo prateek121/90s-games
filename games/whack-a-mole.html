@@ -140,6 +140,7 @@
                 <div class="stat-value" id="accuracy">--</div>
             </div>
         </div>
+        <div id="gameOverMessage" style="color: #ffd700; font-size: 18px; font-weight: bold; margin: 15px 0; min-height: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"></div>
         <div>
             <button onclick="game.reset()">NEW GAME</button>
             <button onclick="location.href='../'">BACK</button>
@@ -187,6 +188,8 @@
                 this.activeMoleId = null;
                 clearInterval(this.timerInterval);
                 this.hideMole();
+                const msg = document.getElementById('gameOverMessage');
+                if (msg) msg.textContent = '';
                 this.updateDisplay();
                 this.startGame();
             },
@@ -252,7 +255,10 @@
                 clearInterval(this.timerInterval);
                 this.hideMole();
                 const accuracy = Math.round((this.hits / (this.hits + this.misses)) * 100) || 0;
-                alert(`Game Over!\nScore: ${this.score}\nHits: ${this.hits}\nAccuracy: ${accuracy}%`);
+                const msg = document.getElementById('gameOverMessage');
+                if (msg) {
+                    msg.textContent = `Game Over! Score: ${this.score} | Hits: ${this.hits} | Accuracy: ${accuracy}%`;
+                }
             },
 
             updateDisplay() {

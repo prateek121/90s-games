@@ -65,9 +65,9 @@
 
     <script>
         const LEVELS = [
-            { width: 8, height: 8, tiles: '........|........|...#....|..###...|.#@.#...|..###...|...#....|........', boxes: [[4, 4]], goals: [[4, 3]] },
-            { width: 10, height: 8, tiles: '........|.......#|#####...|#...#...|#.@.#...|###.##..'.repeat(1), boxes: [[3, 4]], goals: [[4, 4]] },
-            { width: 12, height: 10, tiles: '............|#########..|#..#..@.#|#.$.....#|##.#####.|.......#.'.split('\n'), boxes: [[3, 3], [5, 3]], goals: [[3, 2], [5, 2]] }
+            { boxes: [[4, 4]], goals: [[4, 3]], player: { x: 3, y: 4 } },
+            { boxes: [[3, 4]], goals: [[5, 4]], player: { x: 2, y: 4 } },
+            { boxes: [[3, 3], [5, 3]], goals: [[3, 5], [5, 5]], player: { x: 4, y: 4 } }
         ];
 
         const game = {
@@ -95,16 +95,14 @@
                 this.currentLevel = levelNum % LEVELS.length;
                 const level = LEVELS[this.currentLevel];
 
-                // Simple level creation
                 this.width = 8;
                 this.height = 8;
                 this.cellSize = this.canvas.width / this.width;
 
-                // Initialize grid and objects for this demo
                 this.grid = Array(8).fill().map(() => Array(8).fill(0));
-                this.boxes = [[4, 4]];
-                this.goals = [[4, 3]];
-                this.player = { x: 3, y: 4 };
+                this.boxes = level.boxes.map(b => [b[0], b[1]]);
+                this.goals = level.goals.map(g => [g[0], g[1]]);
+                this.player = { x: level.player.x, y: level.player.y };
                 this.moves = 0;
                 this.gameComplete = false;
             },

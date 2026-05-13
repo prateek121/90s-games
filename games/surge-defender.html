@@ -186,7 +186,7 @@
             },
 
             update() {
-                if (!this.gameRunning) return;
+                if (!this.gameRunning || this.gameOver) return;
 
                 // Charge turret
                 if (this.spacePressed && this.turret.chargeLevel < this.turret.maxCharge) {

@@ -105,14 +105,15 @@
                     if (this.player.x + this.player.width < this.width) this.player.x += this.player.speed;
                 }
 
-                // Spawn waves
+                // Spawn waves (each wave is a partial-width block, leaving a gap to dodge through)
                 this.frameCount++;
                 const spawnRate = Math.max(30, 70 - Math.floor(this.score / 50) * 5);
                 if (this.frameCount % spawnRate === 0) {
+                    const waveWidth = 120 + Math.random() * 100;
                     this.waves.push({
-                        x: 0,
+                        x: Math.random() * (this.width - waveWidth),
                         y: this.height - 30,
-                        width: this.width,
+                        width: waveWidth,
                         height: 30,
                         vy: -(4 + this.score / 150)
                     });

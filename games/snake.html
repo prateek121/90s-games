@@ -124,9 +124,9 @@
             </div>
             <div class="modes">
                 <div class="stat-label">MODE SELECT</div>
-                <button class="mode-btn active" onclick="game.setMode('classic')">Classic</button>
-                <button class="mode-btn" onclick="game.setMode('wrap')">Wrap Edges</button>
-                <button class="mode-btn" onclick="game.setMode('obstacles')">Obstacles</button>
+                <button class="mode-btn active" onclick="game.setMode('classic', this)">Classic</button>
+                <button class="mode-btn" onclick="game.setMode('wrap', this)">Wrap Edges</button>
+                <button class="mode-btn" onclick="game.setMode('obstacles', this)">Obstacles</button>
             </div>
         </div>
     </div>
@@ -191,10 +191,10 @@
                 }
             },
 
-            setMode(mode) {
+            setMode(mode, btn) {
                 this.mode = mode;
-                document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-                event.target.classList.add('active');
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                if (btn) btn.classList.add('active');
                 this.restart();
             },
 
