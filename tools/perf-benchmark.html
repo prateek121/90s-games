@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>90s Games :: Perf Benchmark</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: #131a2b;
+    --panel-2: #1b243a;
+    --text: #e8ecf5;
+    --muted: #8a93a8;
+    --accent: #3ad29f;
+    --warn: #ffb454;
+    --bad: #ff6b6b;
+    --grid: #2a3450;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+  }
+  body {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 12px;
+    padding: 12px;
+  }
+  #gameWrap {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--grid);
+    background: var(--panel-2);
+  }
+  #toolbar h1 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--accent);
+  }
+  #toolbar .game-name {
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+  }
+  #toolbar input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--grid);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+  }
+  button {
+    background: var(--accent);
+    color: #051a14;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--grid);
+  }
+  #frameHost {
+    flex: 1;
+    position: relative;
+    background: #000;
+  }
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+  #placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    text-align: center;
+    padding: 24px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  #panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .card h2 {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+  }
+  .stat-label {
+    color: var(--muted);
+  }
+  .stat-value {
+    text-align: right;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-value.good { color: var(--accent); }
+  .stat-value.warn { color: var(--warn); }
+  .stat-value.bad { color: var(--bad); }
+  #fpsGraph, #heapGraph {
+    width: 100%;
+    height: 80px;
+    display: block;
+    background: var(--bg);
+    border-radius: 4px;
+  }
+  #controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #progressWrap {
+    flex: 1;
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #progress {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.2s linear;
+  }
+  #status {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  pre#jsonOut {
+    background: var(--bg);
+    border: 1px solid var(--grid);
+    border-radius: 4px;
+    padding: 8px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--text);
+    max-height: 240px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .row > * { flex-shrink: 0; }
+  .row .grow { flex: 1; }
+  .note {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+  <main id="gameWrap">
+    <div id="toolbar">
+      <h1>Perf Benchmark</h1>
+      <span class="game-name" id="gameLabel">no game</span>
+      <input id="gameInput" type="text" placeholder="snake.html" />
+      <button id="loadBtn">Load</button>
+    </div>
+    <div id="frameHost">
+      <div id="placeholder">
+        Add <code>?game=&lt;filename&gt;</code> to the URL,<br>
+        or type a filename above and click Load.<br><br>
+        Example: <code>perf-benchmark.html?game=snake.html</code>
+      </div>
+    </div>
+  </main>
+
+  <aside id="panel">
+    <section class="card">
+      <h2>Controls</h2>
+      <div id="controls">
+        <button id="runBtn" disabled>Run 30s</button>
+        <button id="stopBtn" class="secondary" disabled>Stop</button>
+        <div id="progressWrap"><div id="progress"></div></div>
+      </div>
+      <div id="status" style="margin-top: 8px;">idle</div>
+    </section>
+
+    <section class="card">
+      <h2>Live Stats</h2>
+      <div class="stats">
+        <span class="stat-label">FPS (current)</span><span class="stat-value" id="fpsNow">--</span>
+        <span class="stat-label">FPS (avg)</span><span class="stat-value" id="fpsAvg">--</span>
+        <span class="stat-label">FPS (min)</span><span class="stat-value" id="fpsMin">--</span>
+        <span class="stat-label">FPS (p1 low)</span><span class="stat-value" id="fpsP1">--</span>
+        <span class="stat-label">Frame variance (ms&sup2;)</span><span class="stat-value" id="frameVar">--</span>
+        <span class="stat-label">Frames dropped</span><span class="stat-value" id="dropped">--</span>
+        <span class="stat-label">Long frames (&gt;33ms)</span><span class="stat-value" id="longFrames">--</span>
+        <span class="stat-label">Frames total</span><span class="stat-value" id="frames">--</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>FPS over time</h2>
+      <canvas id="fpsGraph"></canvas>
+    </section>
+
+    <section class="card">
+      <h2>Heap (JS Used)</h2>
+      <div class="stats" style="margin-bottom: 8px;">
+        <span class="stat-label">Current</span><span class="stat-value" id="heapNow">--</span>
+        <span class="stat-label">Peak</span><span class="stat-value" id="heapPeak">--</span>
+        <span class="stat-label">Growth</span><span class="stat-value" id="heapGrowth">--</span>
+        <span class="stat-label">GC events (drops)</span><span class="stat-value" id="gcEvents">--</span>
+      </div>
+      <canvas id="heapGraph"></canvas>
+      <div class="note" id="heapNote" style="margin-top: 8px;">
+        performance.memory available only in Chromium-based browsers.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>JSON Report</h2>
+      <div class="row" style="margin-bottom: 8px;">
+        <button id="copyBtn" class="secondary" disabled>Copy report</button>
+        <button id="logBtn" class="secondary" disabled>console.log</button>
+      </div>
+      <pre id="jsonOut">No report yet. Click "Run 30s" once a game has loaded.</pre>
+    </section>
+  </aside>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- Config --------------------------------------------------------------
+  const RUN_DURATION_MS = 30000;
+  const DROPPED_THRESHOLD_MS = 1000 / 50; // anything slower than 50fps counts as dropped
+  const LONG_FRAME_MS = 33.34;            // anything >33ms is a "long frame" (sub-30fps)
+  const HEAP_POLL_MS = 250;
+  const FPS_BUCKET_MS = 250;              // bucket FPS samples for the graph
+
+  // ---- DOM -----------------------------------------------------------------
+  const gameInput  = document.getElementById('gameInput');
+  const gameLabel  = document.getElementById('gameLabel');
+  const loadBtn    = document.getElementById('loadBtn');
+  const runBtn     = document.getElementById('runBtn');
+  const stopBtn    = document.getElementById('stopBtn');
+  const copyBtn    = document.getElementById('copyBtn');
+  const logBtn     = document.getElementById('logBtn');
+  const progress   = document.getElementById('progress');
+  const statusEl   = document.getElementById('status');
+  const frameHost  = document.getElementById('frameHost');
+  const placeholder = document.getElementById('placeholder');
+  const jsonOut    = document.getElementById('jsonOut');
+
+  const fpsNow      = document.getElementById('fpsNow');
+  const fpsAvg      = document.getElementById('fpsAvg');
+  const fpsMin      = document.getElementById('fpsMin');
+  const fpsP1       = document.getElementById('fpsP1');
+  const frameVarEl  = document.getElementById('frameVar');
+  const droppedEl   = document.getElementById('dropped');
+  const longFramesEl = document.getElementById('longFrames');
+  const framesEl    = document.getElementById('frames');
+
+  const heapNow     = document.getElementById('heapNow');
+  const heapPeak    = document.getElementById('heapPeak');
+  const heapGrowth  = document.getElementById('heapGrowth');
+  const gcEvents    = document.getElementById('gcEvents');
+  const heapNote    = document.getElementById('heapNote');
+
+  const fpsGraph    = document.getElementById('fpsGraph');
+  const heapGraph   = document.getElementById('heapGraph');
+
+  // ---- State ---------------------------------------------------------------
+  let iframe = null;
+  let currentGame = null;
+  let originalRAF = null;
+  let originalCAF = null;
+  let rafHookInstalled = false;
+  let frameSamples = []; // ms deltas
+  let fpsBuckets = [];   // { t, fps }
+  let heapSamples = [];  // { t, used }
+  let runStart = 0;
+  let lastFrameTs = 0;
+  let runTimerId = 0;
+  let heapPollId = 0;
+  let drawTimerId = 0;
+  let running = false;
+  let report = null;
+  let activeRafIds = new Set();
+  let rafCallCount = 0; // how many rAF callbacks were registered during run
+
+  // ---- Utils ---------------------------------------------------------------
+  function fmtBytes(n) {
+    if (n == null || !isFinite(n)) return '--';
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+  function fmtNum(n, digits) {
+    if (n == null || !isFinite(n)) return '--';
+    return Number(n).toFixed(digits == null ? 1 : digits);
+  }
+  function setStatus(msg) { statusEl.textContent = msg; }
+  function classify(value, goodAbove, warnAbove) {
+    if (value == null || !isFinite(value)) return '';
+    if (value >= goodAbove) return 'good';
+    if (value >= warnAbove) return 'warn';
+    return 'bad';
+  }
+
+  // ---- Iframe loading ------------------------------------------------------
+  function loadGame(filename) {
+    if (!filename) return;
+    cleanupIframe();
+    placeholder.style.display = 'none';
+
+    iframe = document.createElement('iframe');
+    iframe.setAttribute('title', 'Game under test: ' + filename);
+    // games live at ../games/<file>, this tool lives in /tools/
+    iframe.src = '../games/' + filename;
+    iframe.addEventListener('load', onIframeLoad);
+    iframe.addEventListener('error', () => {
+      setStatus('failed to load ' + filename);
+    });
+    frameHost.appendChild(iframe);
+
+    currentGame = filename;
+    gameLabel.textContent = filename;
+    gameInput.value = filename;
+    runBtn.disabled = true;
+    setStatus('loading ' + filename + ' ...');
+  }
+
+  function cleanupIframe() {
+    if (iframe) {
+      try { iframe.remove(); } catch (_) {}
+      iframe = null;
+    }
+    rafHookInstalled = false;
+    originalRAF = null;
+    originalCAF = null;
+    activeRafIds.clear();
+  }
+
+  function onIframeLoad() {
+    setStatus('ready - press "Run 30s" to start');
+    try {
+      installRAFHook();
+      runBtn.disabled = false;
+    } catch (err) {
+      setStatus('iframe blocked (cross-origin?) - cannot hook RAF: ' + err.message);
+      runBtn.disabled = true;
+    }
+  }
+
+  // ---- RAF hook ------------------------------------------------------------
+  function installRAFHook() {
+    if (!iframe || !iframe.contentWindow) {
+      throw new Error('no iframe content window');
+    }
+    const w = iframe.contentWindow;
+    if (rafHookInstalled) return;
+
+    originalRAF = w.requestAnimationFrame.bind(w);
+    originalCAF = w.cancelAnimationFrame.bind(w);
+
+    w.requestAnimationFrame = function (cb) {
+      rafCallCount++;
+      const wrapped = function (ts) {
+        if (running) {
+          recordFrame(ts);
+        }
+        try {
+          return cb(ts);
+        } catch (e) {
+          // surface but don't break the host
+          console.error('[perf-benchmark] game RAF callback threw:', e);
+        }
+      };
+      const id = originalRAF(wrapped);
+      activeRafIds.add(id);
+      return id;
+    };
+    w.cancelAnimationFrame = function (id) {
+      activeRafIds.delete(id);
+      return originalCAF(id);
+    };
+
+    rafHookInstalled = true;
+  }
+
+  function uninstallRAFHook() {
+    if (!iframe || !iframe.contentWindow || !rafHookInstalled) return;
+    try {
+      const w = iframe.contentWindow;
+      if (originalRAF) w.requestAnimationFrame = originalRAF;
+      if (originalCAF) w.cancelAnimationFrame = originalCAF;
+    } catch (_) {}
+    rafHookInstalled = false;
+  }
+
+  // ---- Frame accounting ----------------------------------------------------
+  function recordFrame(ts) {
+    if (lastFrameTs > 0) {
+      const dt = ts - lastFrameTs;
+      if (dt > 0 && dt < 5000) frameSamples.push(dt);
+    }
+    lastFrameTs = ts;
+  }
+
+  function pollHeap() {
+    if (!iframe || !iframe.contentWindow) return;
+    const perf = iframe.contentWindow.performance;
+    if (!perf || !perf.memory) {
+      heapNote.textContent = 'performance.memory not available in this browser - heap stats disabled.';
+      return;
+    }
+    heapSamples.push({
+      t: performance.now() - runStart,
+      used: perf.memory.usedJSHeapSize,
+      total: perf.memory.totalJSHeapSize,
+      limit: perf.memory.jsHeapSizeLimit
+    });
+  }
+
+  // ---- Run lifecycle -------------------------------------------------------
+  function startRun() {
+    if (!iframe || running) return;
+    frameSamples = [];
+    fpsBuckets = [];
+    heapSamples = [];
+    runStart = performance.now();
+    lastFrameTs = 0;
+    rafCallCount = 0;
+    running = true;
+
+    runBtn.disabled = true;
+    stopBtn.disabled = false;
+    loadBtn.disabled = true;
+    copyBtn.disabled = true;
+    logBtn.disabled = true;
+    setStatus('running...');
+    progress.style.width = '0%';
+
+    heapPollId = setInterval(pollHeap, HEAP_POLL_MS);
+    drawTimerId = setInterval(tickDuringRun, FPS_BUCKET_MS);
+    runTimerId = setTimeout(finishRun, RUN_DURATION_MS);
+
+    // also poll heap once at t=0
+    pollHeap();
+  }
+
+  function stopRun() {
+    finishRun(true);
+  }
+
+  function tickDuringRun() {
+    const elapsed = performance.now() - runStart;
+    const pct = Math.min(100, (elapsed / RUN_DURATION_MS) * 100);
+    progress.style.width = pct.toFixed(1) + '%';
+
+    // bucket FPS for live display - count frames in the last FPS_BUCKET_MS
+    // we approximate by summing deltas in the last bucket from frameSamples
+    let sinceMs = 0;
+    let count = 0;
+    for (let i = frameSamples.length - 1; i >= 0; i--) {
+      sinceMs += frameSamples[i];
+      count++;
+      if (sinceMs >= FPS_BUCKET_MS) break;
+    }
+    const fps = count > 0 && sinceMs > 0 ? (count * 1000 / sinceMs) : 0;
+    fpsBuckets.push({ t: elapsed, fps: fps });
+    updateLiveStats(fps);
+    drawFpsGraph();
+    drawHeapGraph();
+  }
+
+  function finishRun(stoppedEarly) {
+    if (!running) return;
+    running = false;
+    clearTimeout(runTimerId);
+    clearInterval(heapPollId);
+    clearInterval(drawTimerId);
+    runTimerId = heapPollId = drawTimerId = 0;
+
+    progress.style.width = '100%';
+    runBtn.disabled = false;
+    stopBtn.disabled = true;
+    loadBtn.disabled = false;
+
+    report = buildReport(stoppedEarly);
+    jsonOut.textContent = JSON.stringify(report, null, 2);
+    copyBtn.disabled = false;
+    logBtn.disabled = false;
+    setStatus(stoppedEarly ? 'stopped early - report ready' : 'done - report ready');
+
+    // Auto-log to console as required by spec
+    try {
+      console.log('[perf-benchmark] report for ' + currentGame, report);
+    } catch (_) {}
+
+    drawFpsGraph();
+    drawHeapGraph();
+  }
+
+  function buildReport(stoppedEarly) {
+    const durationMs = performance.now() - runStart;
+    const frames = frameSamples.length;
+    const deltas = frameSamples.slice();
+    deltas.sort(function (a, b) { return a - b; });
+    const sum = deltas.reduce(function (a, b) { return a + b; }, 0);
+    const mean = frames ? sum / frames : 0;
+    let varSum = 0;
+    for (let i = 0; i < frames; i++) varSum += (deltas[i] - mean) * (deltas[i] - mean);
+    const variance = frames ? varSum / frames : 0;
+    const stddev = Math.sqrt(variance);
+    const fpsAvgVal = mean > 0 ? 1000 / mean : 0;
+    // p1 low = the slowest 1% of frames as an FPS number
+    const p99Delta = deltas.length ? deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * 0.99))] : 0;
+    const p1FpsVal = p99Delta > 0 ? 1000 / p99Delta : 0;
+    const maxDelta = deltas.length ? deltas[deltas.length - 1] : 0;
+    const minFpsVal = maxDelta > 0 ? 1000 / maxDelta : 0;
+    let dropped = 0, longFrames = 0;
+    for (let i = 0; i < frames; i++) {
+      if (frameSamples[i] > DROPPED_THRESHOLD_MS) dropped++;
+      if (frameSamples[i] > LONG_FRAME_MS) longFrames++;
+    }
+
+    const heap = summarizeHeap(heapSamples);
+
+    return {
+      game: currentGame,
+      timestamp: new Date().toISOString(),
+      durationMs: Math.round(durationMs),
+      stoppedEarly: !!stoppedEarly,
+      frames: {
+        count: frames,
+        avgMs: Number(mean.toFixed(3)),
+        stddevMs: Number(stddev.toFixed(3)),
+        varianceMs2: Number(variance.toFixed(3)),
+        minMs: deltas.length ? Number(deltas[0].toFixed(3)) : 0,
+        maxMs: Number(maxDelta.toFixed(3)),
+        droppedCount: dropped,
+        droppedPct: frames ? Number(((dropped / frames) * 100).toFixed(2)) : 0,
+        longFrameCount: longFrames,
+        longFramePct: frames ? Number(((longFrames / frames) * 100).toFixed(2)) : 0
+      },
+      fps: {
+        avg: Number(fpsAvgVal.toFixed(2)),
+        min: Number(minFpsVal.toFixed(2)),
+        p1Low: Number(p1FpsVal.toFixed(2))
+      },
+      rafRegistrations: rafCallCount,
+      heap: heap,
+      buckets: fpsBuckets.map(function (b) {
+        return { t: Math.round(b.t), fps: Number(b.fps.toFixed(2)) };
+      }),
+      heapSamples: heapSamples.map(function (h) {
+        return { t: Math.round(h.t), used: h.used };
+      }),
+      env: {
+        userAgent: navigator.userAgent,
+        memorySupported: !!(iframe && iframe.contentWindow && iframe.contentWindow.performance && iframe.contentWindow.performance.memory)
+      }
+    };
+  }
+
+  function summarizeHeap(samples) {
+    if (!samples.length) {
+      return {
+        supported: false,
+        currentBytes: null,
+        peakBytes: null,
+        growthBytes: null,
+        gcEventCount: null
+      };
+    }
+    let peak = 0;
+    const first = samples[0].used;
+    const last = samples[samples.length - 1].used;
+    let gc = 0;
+    for (let i = 1; i < samples.length; i++) {
+      if (samples[i].used > peak) peak = samples[i].used;
+      // a "drop" of more than 1MB between consecutive samples = inferred GC
+      if (samples[i - 1].used - samples[i].used > 1024 * 1024) gc++;
+    }
+    if (samples[0].used > peak) peak = samples[0].used;
+    return {
+      supported: true,
+      currentBytes: last,
+      peakBytes: peak,
+      startBytes: first,
+      growthBytes: last - first,
+      gcEventCount: gc
+    };
+  }
+
+  // ---- Live UI -------------------------------------------------------------
+  function updateLiveStats(currentFps) {
+    if (!frameSamples.length) return;
+    const sum = frameSamples.reduce(function (a, b) { return a + b; }, 0);
+    const mean = sum / frameSamples.length;
+    const fpsAvgVal = mean > 0 ? 1000 / mean : 0;
+
+    let dropped = 0, longFrames = 0;
+    let max = 0;
+    for (let i = 0; i < frameSamples.length; i++) {
+      if (frameSamples[i] > DROPPED_THRESHOLD_MS) dropped++;
+      if (frameSamples[i] > LONG_FRAME_MS) longFrames++;
+      if (frameSamples[i] > max) max = frameSamples[i];
+    }
+    const sortedCopy = frameSamples.slice().sort(function (a, b) { return a - b; });
+    const p99 = sortedCopy[Math.min(sortedCopy.length - 1, Math.floor(sortedCopy.length * 0.99))];
+    const p1Fps = p99 > 0 ? 1000 / p99 : 0;
+    const minFps = max > 0 ? 1000 / max : 0;
+    let varSum = 0;
+    for (let i = 0; i < frameSamples.length; i++) varSum += (frameSamples[i] - mean) * (frameSamples[i] - mean);
+    const variance = varSum / frameSamples.length;
+
+    fpsNow.textContent = fmtNum(currentFps);
+    fpsAvg.textContent = fmtNum(fpsAvgVal);
+    fpsMin.textContent = fmtNum(minFps);
+    fpsP1.textContent  = fmtNum(p1Fps);
+    frameVarEl.textContent = fmtNum(variance, 2);
+    droppedEl.textContent = String(dropped);
+    longFramesEl.textContent = String(longFrames);
+    framesEl.textContent = String(frameSamples.length);
+
+    fpsNow.className = 'stat-value ' + classify(currentFps, 55, 30);
+    fpsAvg.className = 'stat-value ' + classify(fpsAvgVal, 55, 30);
+    fpsP1.className  = 'stat-value ' + classify(p1Fps, 50, 25);
+
+    if (heapSamples.length) {
+      const last = heapSamples[heapSamples.length - 1];
+      const first = heapSamples[0];
+      let peak = 0;
+      for (let i = 0; i < heapSamples.length; i++) {
+        if (heapSamples[i].used > peak) peak = heapSamples[i].used;
+      }
+      let gc = 0;
+      for (let i = 1; i < heapSamples.length; i++) {
+        if (heapSamples[i - 1].used - heapSamples[i].used > 1024 * 1024) gc++;
+      }
+      heapNow.textContent = fmtBytes(last.used);
+      heapPeak.textContent = fmtBytes(peak);
+      heapGrowth.textContent = fmtBytes(last.used - first.used);
+      gcEvents.textContent = String(gc);
+    }
+  }
+
+  // ---- Graphs --------------------------------------------------------------
+  function fitCanvas(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: w, h: h };
+  }
+
+  function drawFpsGraph() {
+    const f = fitCanvas(fpsGraph);
+    const ctx = f.ctx, w = f.w, h = f.h;
+    ctx.clearRect(0, 0, w, h);
+    // grid lines for 30 and 60 fps
+    ctx.strokeStyle = '#2a3450';
+    ctx.lineWidth = 1;
+    [30, 60].forEach(function (line) {
+      const y = h - (line / 75) * h;
+      ctx.beginPath();
+      ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    });
+    if (!fpsBuckets.length) return;
+    ctx.beginPath();
+    ctx.strokeStyle = '#3ad29f';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < fpsBuckets.length; i++) {
+      const x = (fpsBuckets[i].t / RUN_DURATION_MS) * w;
+      const y = h - Math.min(75, fpsBuckets[i].fps) / 75 * h;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  function drawHeapGraph() {
+    const f = fitCanvas(heapGraph);
+    const ctx = f.ctx, w = f.w, h = f.h;
+    ctx.clearRect(0, 0, w, h);
+    if (!heapSamples.length) return;
+    let peak = 1;
+    for (let i = 0; i < heapSamples.length; i++) {
+      if (heapSamples[i].used > peak) peak = heapSamples[i].used;
+    }
+    ctx.beginPath();
+    ctx.strokeStyle = '#ffb454';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < heapSamples.length; i++) {
+      const x = (heapSamples[i].t / RUN_DURATION_MS) * w;
+      const y = h - (heapSamples[i].used / peak) * h * 0.95 - 2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // ---- Buttons -------------------------------------------------------------
+  loadBtn.addEventListener('click', function () {
+    const v = gameInput.value.trim();
+    if (v) loadGame(v);
+  });
+  gameInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') loadBtn.click();
+  });
+  runBtn.addEventListener('click', startRun);
+  stopBtn.addEventListener('click', stopRun);
+  copyBtn.addEventListener('click', function () {
+    if (!report) return;
+    const text = JSON.stringify(report, null, 2);
+    try {
+      navigator.clipboard.writeText(text).then(function () {
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = 'Copied!';
+        setTimeout(function () { copyBtn.textContent = orig; }, 1500);
+      });
+    } catch (_) {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+    }
+  });
+  logBtn.addEventListener('click', function () {
+    if (report) console.log('[perf-benchmark] report for ' + currentGame, report);
+  });
+
+  // ---- Boot ----------------------------------------------------------------
+  function parseQuery() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('game');
+  }
+  const initialGame = parseQuery();
+  if (initialGame) loadGame(initialGame);
+
+  // sanity heap-API note
+  if (!performance || !performance.memory) {
+    heapNote.textContent = 'performance.memory is unavailable in this browser - open in Chrome/Edge for heap stats.';
+  }
+})();
+</script>
+</body>
+</html>
