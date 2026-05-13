@@ -224,12 +224,13 @@
             bits = [];
             selected = [];
 
-            const gridSize = 3 + Math.floor(game.level / 2);
+            let gridSize = 3 + Math.floor(game.level / 2);
+            if ((gridSize * gridSize) % 2 !== 0) gridSize++;
             const startX = (canvas.width - (gridSize * 80)) / 2 + 40;
             const startY = (canvas.height - (gridSize * 80)) / 2 + 40;
 
             const values = [];
-            for (let i = 0; i < gridSize * gridSize / 2; i++) {
+            for (let i = 0; i < (gridSize * gridSize) / 2; i++) {
                 const binary = Math.floor(Math.random() * 256).toString(2).padStart(8, '0');
                 values.push(binary, binary);
             }

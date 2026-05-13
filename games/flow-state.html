@@ -139,13 +139,15 @@
             },
 
             startTimer() {
-                const timer = setInterval(() => {
+                if (this._timer) clearInterval(this._timer);
+                this._timer = setInterval(() => {
                     if (this.gameRunning && this.timeLeft > 0) {
                         this.timeLeft--;
                     } else if (this.timeLeft <= 0) {
                         this.gameRunning = false;
                         this.gameOver = true;
-                        clearInterval(timer);
+                        clearInterval(this._timer);
+                        this._timer = null;
                         if (this.score > this.best) {
                             this.best = this.score;
                             localStorage.setItem('flowStateBest', this.best);

@@ -244,8 +244,11 @@
                 }
 
                 this.correctMapping = {};
+                const usedChars = new Set(text.split('').filter(c => alphabet.includes(c)));
                 for (let i = 0; i < alphabet.length; i++) {
-                    this.correctMapping[shuffled[i]] = alphabet[i];
+                    if (usedChars.has(alphabet[i])) {
+                        this.correctMapping[shuffled[i]] = alphabet[i];
+                    }
                 }
 
                 return encrypted;
@@ -278,8 +281,9 @@
             selectLetter(char) {
                 if (!this.gameActive) return;
                 if (this.mapping[char]) {
+                    const prev = this.mapping[char];
                     delete this.mapping[char];
-                    delete this.reverseMapping[this.mapping[char]];
+                    delete this.reverseMapping[prev];
                 } else {
                     // Show input for mapping
                     const target = prompt(`Map ${char} to which letter?`);
