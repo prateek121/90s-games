@@ -1,76 +1,81 @@
 # 90s Games
 
-> 114 self-contained, retro-inspired HTML5 Canvas games. Zero dependencies. Single-file. Plays in any modern browser.
+> 114 single-file arcade games. No build. No dependencies. Open and play.
+
+![90s Games preview](docs/preview.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Made with: HTML5 + Vanilla JS](https://img.shields.io/badge/HTML5-Vanilla%20JS-orange)](#)
-[![Dependencies: None](https://img.shields.io/badge/dependencies-none-brightgreen)](#)
-[![Deploy: GitHub Pages](https://img.shields.io/badge/Play-Online-blue)](https://prateek121.github.io/90s-games/)
+[![Dependencies: none](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#design-constraints)
+[![Play online](https://img.shields.io/badge/play-online-blue.svg)](https://prateek121.github.io/90s-games/)
 
-## 🎮 Play online
+## The 30-second pitch
 
-**[Open the live arcade →](https://prateek121.github.io/90s-games/)**
+A handful of HTML files. Each one is a complete arcade game — asteroids, tetris, snake, plus a hundred others — written in plain JavaScript with the Canvas API. No npm. No bundler. No tracking. Double-click a file and you are playing.
 
-<!-- Drop a screenshot or GIF here. Suggested: 1200×630 PNG of the index page, or an animated GIF of one game in action. -->
-<!-- ![90s Games preview](docs/preview.png) -->
+Useful if you want games you can read end-to-end in one sitting, fork in five minutes, or drop into a kiosk, a classroom, or your own static site without dragging in half of node_modules.
 
-## What's inside
+## Why this exists
 
-114 small, focused arcade and puzzle games — breakout, asteroids, snake, tetris, pong, plus dozens of original takes on classic mechanics. Each game is one HTML file. Open it in a browser, play it. No installer, no build, no package manager.
+Modern web games come bundled with twelve megabytes of framework before the first pixel renders. They want a service worker, a state-management library, and a build pipeline that takes longer to set up than the game takes to play. There is nothing wrong with that for big projects, but the toll on small ones is real — the cost of starting a tiny game is now larger than the game itself.
+
+These are the opposite. Each one is fifteen to thirty kilobytes, one file, no install. You can read the whole source in a coffee break and change the physics in the next one. They are deliberately small enough to be hackable and deliberately old-fashioned enough to feel like the after-school computer lab. That is the entire idea.
 
 ## Quick start
 
 ```bash
 git clone https://github.com/prateek121/90s-games.git
 cd 90s-games
-open index.html       # macOS
-# or: xdg-open index.html   (Linux)
-# or: start index.html      (Windows)
+open index.html              # macOS
+xdg-open index.html          # Linux
+start index.html             # Windows
 ```
 
-Or just double-click `index.html` in your file manager.
+Or play online at <https://prateek121.github.io/90s-games/>.
 
-To play a single game directly, open its file in `games/`:
+To launch a single game directly, open its file in `games/`:
 
 ```bash
 open games/asteroids.html
 ```
 
-## Repo layout
+## Ten must-play games
 
-```
-90s-games/
-├── index.html        # Landing page that links to all 114 games
-├── games/            # 114 single-file HTML5 games
-├── lib/              # Optional shared helpers (game-framework.js, utils.js)
-├── docs/             # Developer docs (API, design, dev guide)
-├── LICENSE           # MIT
-├── CONTRIBUTING.md
-└── CODE_OF_CONDUCT.md
-```
+| Game | The hook |
+| --- | --- |
+| [Asteroids](games/asteroids.html) | Vector rocks, inertia, and one ship that does not stop unless you tell it to. |
+| [Tetris](games/tetris.html) | The seven tetrominoes, the wall kick, the slow drift toward unwinnable. |
+| [Snake](games/snake.html) | Three keys, one rule, and the worst self-inflicted defeat in gaming. |
+| [Pac-Man](games/pacman.html) | Maze, dots, four ghosts with distinct personalities — small and faithful. |
+| [Space Invaders](games/space-invaders.html) | The aliens speed up as you kill them. They always did. |
+| [2048](games/2048.html) | Merge tiles, regret choices, restart. |
+| [Minesweeper](games/minesweeper.html) | Logic puzzle disguised as a war crime. Right-click to flag. |
+| [Sokoban](games/sokoban.html) | Push the boxes onto the targets. Undo is your friend. |
+| [Bullet Hell](games/bullet-hell.html) | Thread a needle through a screenful of glowing death. |
+| [Vaporwave Escape](games/vaporwave-escape.html) | A neon-grid runner with a synth soundtrack baked into the page. |
 
-## Design principles
+The other 104 are linked from the [index page](index.html), grouped by genre.
 
-- **Single file per game.** No external CSS, JS, fonts, or images. Easy to inspect, fork, embed.
-- **Vanilla JS only.** No frameworks, no transpilation, no build step.
-- **`localStorage` for high scores.** Persistent across sessions, fully offline.
-- **Keyboard + mouse + touch.** Most games work on phones and tablets.
-- **Readable.** Each game is ~400–600 lines, designed to be read and modified.
+## Design constraints
+
+- One HTML file per game. No external CSS, JS, fonts, or images.
+- Vanilla JavaScript only — no frameworks, no transpilation, no build step.
+- `localStorage` for high scores, under a key like `<game-slug>-best`.
+- Keyboard for desktop, touch where the mechanic allows.
+- Roughly 400 to 600 lines per game so the source stays readable in one pass.
+- No network calls. No analytics. No service workers. The page works offline the moment you save it.
 
 ## Browser support
 
-Tested on the latest two versions of Chrome, Firefox, Safari, and Edge. Requires Canvas 2D, `requestAnimationFrame`, and `localStorage` — supported by every browser shipped since ~2013.
-
-## Use cases
-
-- Drop-in arcade for personal websites, kiosk demos, classroom labs
-- Reference implementations for game-mechanic prototypes
-- Teaching material — every game is short enough to read top-to-bottom
+Anything shipped after about 2013 — Chrome, Firefox, Safari, Edge. Requires Canvas 2D, `requestAnimationFrame`, and `localStorage`. Tested on current versions of all four.
 
 ## Contributing
 
-PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for game submission standards and code style.
+New games, bug fixes, mobile-touch improvements, and accessibility work are all welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for submission standards and code style. New games should fit the single-file, no-dependencies rule and link from `index.html`.
+
+## Screenshots
+
+The hero image and per-game previews under `docs/` are generated by `tools/screenshot.sh`. See [tools/README-screenshot.md](tools/README-screenshot.md) for details.
 
 ## License
 
-[MIT](LICENSE) — use it for anything, just keep the copyright notice.
+[MIT](LICENSE). Use it for anything. Keep the copyright notice.
