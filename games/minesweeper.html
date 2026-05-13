@@ -217,6 +217,8 @@
                 this.render();
                 document.getElementById('mineCounter').textContent = String(this.mineCount).padStart(3, '0');
                 document.getElementById('timer').textContent = '000';
+                const status = document.getElementById('msStatus');
+                if (status) status.textContent = '';
             },
 
             placeMines() {
@@ -265,7 +267,7 @@
                     this.gameOver = true;
                     this.revealAll();
                     clearInterval(this.timerInterval);
-                    setTimeout(() => alert('💥 Game Over! You hit a mine.'), 100);
+                    this.showStatus('Game Over! You hit a mine.', '#ff0000');
                     return;
                 }
 
@@ -316,8 +318,20 @@
                     this.won = true;
                     clearInterval(this.timerInterval);
                     this.render();
-                    setTimeout(() => alert(`🎉 You won in ${this.time} seconds!`), 100);
+                    this.showStatus(`You won in ${this.time} seconds!`, '#008000');
                 }
+            },
+
+            showStatus(text, color) {
+                let el = document.getElementById('msStatus');
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = 'msStatus';
+                    el.style.cssText = 'text-align:center;font-weight:bold;margin-top:8px;font-size:13px;';
+                    document.querySelector('.content').appendChild(el);
+                }
+                el.textContent = text;
+                el.style.color = color;
             },
 
             revealAll() {

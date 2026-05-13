@@ -189,19 +189,20 @@
                         diskEl.className = 'disk';
                         diskEl.style.width = (20 + disk * 15) + 'px';
                         diskEl.textContent = disk;
-                        diskEl.onclick = () => this.selectDisk(rodIndex);
+                        diskEl.onclick = (e) => {
+                            e.stopPropagation();
+                            if (this.selectedRod === null) {
+                                this.selectDisk(rodIndex);
+                                this.render();
+                            } else {
+                                this.moveDisk(rodIndex);
+                            }
+                        };
                         if (disk === this.selectedDisk && rodIndex === this.selectedRod) {
                             diskEl.classList.add('selected');
                         }
                         rodEl.appendChild(diskEl);
                     }
-
-                    // Click on rod to place disk
-                    rodEl.addEventListener('click', (e) => {
-                        if (e.target === rodEl) {
-                            this.moveDisk(rodIndex);
-                        }
-                    });
                 }
 
                 document.getElementById('moves').textContent = this.moves;
@@ -209,10 +210,18 @@
             },
 
             setupInput() {
+                for (let rodIndex = 0; rodIndex < 3; rodIndex++) {
+                    const rodEl = document.getElementById(`rod${rodIndex}`);
+                    rodEl.addEventListener('click', (e) => {
+                        if (e.target === rodEl) {
+                            this.moveDisk(rodIndex);
+                        }
+                    });
+                }
                 document.addEventListener('keydown', (e) => {
-                    if (e.key === '1') this.selectDisk(0);
-                    if (e.key === '2') this.selectDisk(1);
-                    if (e.key === '3') this.selectDisk(2);
+                    if (e.key === '1') { this.selectDisk(0); this.render(); }
+                    if (e.key === '2') { this.selectDisk(1); this.render(); }
+                    if (e.key === '3') { this.selectDisk(2); this.render(); }
                 });
             }
         };

@@ -175,7 +175,7 @@
             },
 
             update() {
-                if (!this.gameRunning) return;
+                if (!this.gameRunning || this.gameOver) return;
 
                 // Player movement
                 if (this.keys['ArrowLeft']) this.player.x = Math.max(0, this.player.x - this.player.speed);
@@ -197,7 +197,7 @@
                     if (e.y > this.height) {
                         this.health -= 10;
                         this.enemies.splice(i, 1);
-                        if (this.health <= 0) this.gameOver = true;
+                        if (this.health <= 0) { this.gameOver = true; this.gameRunning = false; }
                     }
 
                     // Wall bounce
@@ -224,7 +224,7 @@
                     if (this.player.x < e.x + e.w && this.player.x + this.player.w > e.x &&
                         this.player.y < e.y + e.h && this.player.y + this.player.h > e.y) {
                         this.health -= 5;
-                        if (this.health <= 0) this.gameOver = true;
+                        if (this.health <= 0) { this.gameOver = true; this.gameRunning = false; }
                     }
                 }
 

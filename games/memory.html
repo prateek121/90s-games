@@ -199,11 +199,17 @@
                         if (this.matched.length === this.cards.length) {
                             this.gameComplete = true;
                             clearInterval(this.timerInterval);
-                            setTimeout(() => alert(`🎉 You won in ${this.moves} moves and ${this.time} seconds!`), 500);
                             if (!this.bestTime || this.time < parseInt(this.bestTime)) {
                                 this.bestTime = this.time;
                                 localStorage.setItem('memoryBestTime', this.time);
                             }
+                            const winMsg = document.createElement('div');
+                            winMsg.style.cssText = 'color:#ffd700;font-size:20px;margin-top:15px;font-weight:bold;';
+                            winMsg.textContent = `You won in ${this.moves} moves and ${this.time} seconds!`;
+                            const existing = document.getElementById('winMsg');
+                            if (existing) existing.remove();
+                            winMsg.id = 'winMsg';
+                            document.querySelector('.container').appendChild(winMsg);
                         }
                     } else {
                         setTimeout(() => {
@@ -226,6 +232,9 @@
                 this.gameStarted = false;
                 this.gameComplete = false;
                 clearInterval(this.timerInterval);
+                const existing = document.getElementById('winMsg');
+                if (existing) existing.remove();
+                document.getElementById('time').textContent = '0s';
                 this.createCards();
                 this.render();
                 this.updateStats();

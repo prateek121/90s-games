@@ -172,7 +172,7 @@
             },
 
             update() {
-                if (!this.gameRunning) return;
+                if (!this.gameRunning || this.gameOver) return;
 
                 // Turret rotation
                 if (this.keys['ArrowLeft']) this.turret.angle -= this.turret.speed;
@@ -216,6 +216,7 @@
                     const e = this.enemies[i];
                     if (e.radius < 20) {
                         this.gameOver = true;
+                        this.gameRunning = false;
                         return;
                     }
                     e.radius -= e.speed * 0.5;
