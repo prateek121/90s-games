@@ -121,6 +121,7 @@
             },
 
             newGame() {
+                if (this._timer) clearInterval(this._timer);
                 this.createGrid();
                 this.selected = [];
                 this.particles = [];
@@ -132,12 +133,13 @@
                 this.timeLeft = this.baseTime;
                 this.gameRunning = true;
 
-                const timer = setInterval(() => {
+                this._timer = setInterval(() => {
                     if (this.gameRunning) {
                         this.timeLeft--;
                         if (this.timeLeft <= 0) {
                             this.gameRunning = false;
-                            clearInterval(timer);
+                            clearInterval(this._timer);
+                            this._timer = null;
                             if (this.score > this.best) {
                                 this.best = this.score;
                                 localStorage.setItem('prismMatchBest', this.best);
@@ -148,7 +150,7 @@
             },
 
             createGrid() {
-                const colors = ['#ff0080', '#00ffff', '#ffff00', '#00ff00', '#ff00ff', '#ff0000', '#00ffff', '#ffff00'];
+                const colors = ['#ff0080', '#00ffff', '#ffff00', '#00ff00', '#ff00ff', '#ff0000', '#ff8800', '#00ff88'];
                 this.tiles = [];
                 const tileColors = [...colors, ...colors].sort(() => Math.random() - 0.5);
 

@@ -197,6 +197,10 @@
                         this.createParticles(circle.x, circle.y);
                         this.circles.splice(i, 1);
                         hit = true;
+                        if (this.score > this.highScore) {
+                            this.highScore = this.score;
+                            localStorage.setItem('pulseBeatHigh', this.highScore);
+                        }
                         break;
                     }
                 }

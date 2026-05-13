@@ -247,10 +247,12 @@
 
                 // Draw explosions
                 for (let e of this.explosions) {
-                    this.ctx.fillStyle = `rgba(${e.color}, ${e.life / 30})`;
+                    this.ctx.globalAlpha = Math.max(0, e.life / 30);
+                    this.ctx.fillStyle = e.color;
                     this.ctx.beginPath();
                     this.ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
                     this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
                 }
 
                 // Draw cursor

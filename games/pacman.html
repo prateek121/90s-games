@@ -100,13 +100,13 @@
         const GRID_SIZE = 20;
         const CELL_SIZE = 20;
         const COLS = 20;
-        const ROWS = 21;
+        const ROWS = 18;
 
         const game = {
             canvas: document.getElementById('gameCanvas'),
             ctx: null,
             maze: [],
-            pacman: { x: 10, y: 15, direction: 0, nextDirection: 0, mouthOpen: true },
+            pacman: { x: 10, y: 16, direction: 0, nextDirection: 0, mouthOpen: true },
             ghosts: [],
             dots: [],
             powerPellets: [],
@@ -156,10 +156,10 @@
 
             createGhosts() {
                 this.ghosts = [
-                    { x: 9, y: 9, color: '#ff0000', direction: 1 },
-                    { x: 10, y: 9, color: '#ffb8ff', direction: 0 },
-                    { x: 9, y: 10, color: '#00ffff', direction: 1 },
-                    { x: 10, y: 10, color: '#ffb851', direction: 0 }
+                    { x: 9, y: 10, color: '#ff0000', direction: 1 },
+                    { x: 10, y: 10, color: '#ffb8ff', direction: 0 },
+                    { x: 8, y: 12, color: '#00ffff', direction: 1 },
+                    { x: 11, y: 12, color: '#ffb851', direction: 0 }
                 ];
             },
 

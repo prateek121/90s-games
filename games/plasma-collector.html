@@ -148,7 +148,7 @@
             },
 
             update() {
-                if (!this.gameRunning) return;
+                if (!this.gameRunning || this.gameOver) return;
 
                 // Move collector toward mouse
                 const dx = this.mouseX - this.collector.x;
@@ -225,6 +225,7 @@
                     const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
                     if (pdist < this.collector.radius + p.radius) {
                         this.gameOver = true;
+                        this.gameRunning = false;
                     }
                     return true;
                 });

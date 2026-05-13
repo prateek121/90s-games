@@ -150,7 +150,7 @@
             },
 
             update() {
-                if (!this.gameRunning) return;
+                if (!this.gameRunning || this.gameOver) return;
 
                 // Player movement
                 if (this.keys['ArrowLeft']) this.player.angle -= 0.1;
@@ -181,6 +181,7 @@
                     if (this.player.x < o.x + o.w && this.player.x + this.player.radius > o.x &&
                         this.player.y < o.y + o.h && this.player.y + this.player.radius > o.y) {
                         this.gameOver = true;
+                        this.gameRunning = false;
                     }
 
                     return o.y < this.height + 50;
